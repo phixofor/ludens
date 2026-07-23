@@ -58,7 +58,7 @@ sandbox.globalThis = sandbox;
 
 const instrumented = scriptMatch[1].replace(
   "resize(); renderHand(); requestAnimationFrame(loop);",
-  "globalThis.__game={G,bossAlive,breakBlock,sellValue,refreshShop,renderShop,reset,CARDS,count,ballCount,ballDmg,coinMult,wallHit,spawnRow,spawnBoss,endTurn,hitBlock,cardPrice,buildOffers,bossGeom,checkSupport,critChance,pierceChance,baseHpAt,newBlock,ballPackPrice,rerollPrice,openShop,update,fire,resize,bx,by,tableClearBonus,beginTable,enterCashout,computeCashoutTally,loadMeta,saveMeta,clearMeta,isUnlocked,checkAchievements,LOCKED_JOKERS,tableName,pickOffer,storageGet,storageSet,META_KEY,advanceToNextTable};"
+  "globalThis.__game={G,bossAlive,breakBlock,sellValue,refreshShop,renderShop,reset,CARDS,count,ballCount,ballDmg,coinMult,wallHit,spawnRow,spawnBoss,endTurn,hitBlock,cardPrice,buildOffers,bossGeom,checkSupport,checkLoss,critChance,pierceChance,baseHpAt,newBlock,ballPackPrice,rerollPrice,openShop,update,fire,resize,bx,by,tableClearBonus,beginTable,enterCashout,computeCashoutTally,loadMeta,saveMeta,clearMeta,isUnlocked,checkAchievements,LOCKED_JOKERS,tableName,pickOffer,storageGet,storageSet,META_KEY,advanceToNextTable};"
 );
 assert.notEqual(instrumented, scriptMatch[1], "game script test hook was installed");
 vm.runInNewContext(instrumented, sandbox);
@@ -66,7 +66,7 @@ vm.runInNewContext(instrumented, sandbox);
 const {
   G, bossAlive, breakBlock, refreshShop, renderShop, reset,
   CARDS, count, ballCount, ballDmg, coinMult, wallHit,
-  spawnRow, spawnBoss, endTurn, hitBlock, cardPrice, buildOffers, bossGeom, checkSupport,
+  spawnRow, spawnBoss, endTurn, hitBlock, cardPrice, buildOffers, bossGeom, checkSupport, checkLoss,
   critChance, pierceChance, baseHpAt, newBlock, ballPackPrice, rerollPrice, openShop, update, fire, resize, bx, by,
   tableClearBonus, beginTable, enterCashout, computeCashoutTally, loadMeta, saveMeta, clearMeta,
   isUnlocked, checkAchievements, LOCKED_JOKERS, tableName, pickOffer, storageGet, storageSet, META_KEY, advanceToNextTable,
@@ -127,7 +127,45 @@ assert.equal(G.shake, 0);
 assert.equal(G.rerollCost, 3);
 assert.equal(G.offers.length, 0);
 
-/* ---------- CARDS integrity: 42 entries, valid rarity ---------- */
+/* ---------- lethal-state invariants ---------- */
+{
+  Object.assign(G, { jokers: ["dud", "dud"], stats: { broken: 0 }, jstate: {} });
+  assert.equal(ballDmg(), 1, "downside jokers must never create zero or healing ball damage");
+}
+{
+  Object.assign(G, { jokers: ["hardhat"], destroyedThisTurn: 0, tstats: { broken: 0, cut: 0, crits: 0 } });
+  const block = newBlock(2, 3, 3, "chip", 1, 1);
+  const ball = { x: bx(block), y: by(block), vx: 0, vy: -1, r: 2, dmg: 1, idx: 0, anchor: false };
+  withConstantRandom(0.99, () => hitBlock(ball, block));
+  assert.equal(block.hp, 2, "Hard Hat's chip penalty must floor at one damage");
+}
+{
+  Object.assign(G, { screen: "play", blocks: [{ boss: false, type: "chip", dead: true, row: 999 }] });
+  assert.equal(checkLoss(), false, "a chip destroyed on the danger line must not cause game over before cleanup");
+}
+{
+  Object.assign(G, { coins: 0, jokers: [], particles: [], floats: [], coinfx: [], destroyedThisTurn: 0,
+    stats: { broken: 0 }, tstats: { broken: 0, cut: 0, crits: 0 }, newUnlocksThisRun: [] });
+  const block = { boss: false, dead: false, row: 0, hp: 0, maxhp: 1, reward: 1, dispRow: 0,
+    col: 0, cw: 1, chh: 1, kind: "square" };
+  breakBlock(block, null);
+  breakBlock(block, null);
+  assert.equal(G.coins, 1, "the same destroyed chip can only pay once");
+  assert.equal(G.stats.broken, 1, "the same destroyed chip can only increment stats once");
+}
+{
+  Object.assign(G, { coins: 0, jokers: ["blastcap"], particles: [], floats: [], coinfx: [],
+    destroyedThisTurn: 0, stats: { broken: 0 }, tstats: { broken: 0, cut: 0, crits: 0 },
+    blocks: [
+      { col: 1, row: 2, cw: 1, chh: 1, type: "chip", boss: false, dead: false, hp: 2, maxhp: 2, reward: 1, rot: 0, kind: "square", dispRow: 2 },
+      { col: 2, row: 2, cw: 1, chh: 1, type: "chip", boss: false, dead: false, hp: 1, maxhp: 1, reward: 1, rot: 0, kind: "square", dispRow: 2 },
+    ] });
+  checkSupport();
+  assert.equal(G.coins, 2, "a splash-killed chip in a falling cluster must not also receive a detach payout");
+  assert.equal(G.stats.broken, 2, "a splash-killed falling chip is counted exactly once");
+}
+
+/* ---------- CARDS integrity: 89 entries, valid rarity ---------- */
 const cardIds = Object.keys(CARDS);
 assert.equal(cardIds.length, 89, "roster must have 89 jokers");
 const validRar = new Set(["common", "uncommon", "rare", "legendary"]);

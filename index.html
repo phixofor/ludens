@@ -4,8 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>BALLATRO</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
 <style>
   :root{
     --felt:#0c3a30; --felt2:#0a2f27; --felt-edge:#072019;
@@ -397,8 +395,8 @@ function replayBonus(id,b,ball){
 function ballCount(){ const other=G.jokers.length-rawCount('juggler');
   return Math.max(1, 4+count('rapid')+(G.bonusBalls||0)-2*count('glass')+count('juggler')*Math.floor(other/2)+2*count('candle')
     +count('dud')+count('riser')-Math.max(0,G.jokers.length-2)*count('minimalist')); }
-function ballDmg(){ return 1+count('heavy')+3*count('glass')+Math.floor((G.stats.broken||0)/30)*count('snowball')+(G.jstate.avalanche||0)
-  -1*count('dud')+2*count('minimalist'); }
+function ballDmg(){ return Math.max(1,1+count('heavy')+3*count('glass')+Math.floor((G.stats.broken||0)/30)*count('snowball')+(G.jstate.avalanche||0)
+  -1*count('dud')+2*count('minimalist')); }
 function coinMult(){ let m=1+0.5*count('midas')+0.1*Math.min(6,G.jstate.inv||0)*count('investor');
   m*=Math.pow(0.75,count('laser')); m*=Math.pow(1.5,count('highroller'));
   if((G.bossMod==='miser'||G.bossMod2==='miser')&&bossAlive())m*=0.5; return m; }
@@ -531,6 +529,7 @@ function endTurn(){
 }
 function checkLoss(){
   for(const b of G.blocks){
+    if(b.dead)continue;
     if(b.boss){ if(b.row+(b.rowSpan-1)>=rowsFit-1){ gameOver(); return true; } }
     else if(b.type==='chip' && b.row>=rowsFit-1){ gameOver(); return true; }
   } return false;
@@ -589,6 +588,7 @@ function checkSupport(){
   return any;
 }
 function detachChip(b){
+  if(b.dead)return;
   b.dead=true;
   let c=Math.round(b.reward*coinMult());
   const dm=count('demolition'); if(dm>0){ c+=dm; jokerProc('demolition'); }
@@ -605,6 +605,7 @@ function detachChip(b){
     rot:b.rot,sKind:b.kind,cw:b.cw,chh:b.chh,hp:b.hp,life:1});
 }
 function breakBlock(b,ball){
+  if(b.dead)return;
   const bRow=b.row;
   b.dead=true; G._died=true;
   if(b.boss){ burst(W/2,bossGeom(b).cy,'#e8452e',40); G.shake=16; }
@@ -698,7 +699,7 @@ function hitBlock(ball,b){
   if(isLastBall(ball)){ dmg+=2*count('lastcall'); dmg+=3*count('lastlaugh'); }
   if(count('edgelord')>0 && (b.kind==='triUp'||b.kind==='triDn')){ dmg+=2*count('edgelord'); jokerProc('edgelord'); }
   if(count('deadcenter')>0 && b.col===Math.floor(COLS/2)){ dmg*=Math.pow(2,count('deadcenter')); jokerProc('deadcenter'); }
-  if(count('hardhat')>0){ dmg=Math.max(0,dmg-1*count('hardhat')); jokerProc('hardhat'); }
+  if(count('hardhat')>0){ dmg=Math.max(1,dmg-1*count('hardhat')); jokerProc('hardhat'); }
   const bruise=count('bruiser')>0 && tierIndexForHp(b.maxhp||b.reward)===0;
   const cc=critChance(), crit=cc>0 && Math.random()<cc;
   if(crit){ dmg*=2; critFlash(cx0,cy0); jokerProc('headhunter'); G.tstats.crits=(G.tstats.crits||0)+1; }

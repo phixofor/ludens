@@ -2,7 +2,7 @@
 
 A single-file mobile web game that mashes **Holedown**'s squishy ball-bouncing with **Balatro**'s joker-card economy. Break the chips, bank the money, stack five jokers, and survive a boss every 12 rounds.
 
-![Gameplay](screenshots/gameplay.png)
+![Gameplay](ballatro/screenshots/gameplay.png)
 
 **▶ Play:** `https://USERNAME.github.io/ballatro/` *(live once GitHub Pages is enabled — see below)*
 
@@ -142,4 +142,4 @@ After pushing, go to **Settings → Pages → Build and deployment → Deploy fr
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](ballatro/LICENSE).

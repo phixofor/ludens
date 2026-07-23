@@ -13,8 +13,8 @@ A single-file mobile web game that mashes **Holedown**'s squishy ball-bouncing w
 - Clear the chips before they cross the dashed danger line. **Chips are supported by anchors** — the top row (newest, attached to the ceiling) and the boss (if alive). Break a chip holding up a cluster and the rest **fall off the board**, adding their starting HP to Score while retaining their normal Cash payout. This is the core skill: aim for the load-bearing block, not the stack above it.
 - The **shop** opens after rounds 2 and 4, then again after the boss. You hold five jokers, and every shop sells **Ball Packs** for permanent +1 ball ($10 Cash first, +$6 each after).
 - Every table has six normal rounds, followed by a **boss brick** and overtime pressure rows until it falls. Its armor floors weak hits at 1 damage, so you need damage jokers to punch through before it descends onto you.
-- Breaking or cutting chips retains its normal **Cash** payout and also adds the chip's starting HP to **Score**; actual boss damage adds Score. Each board also deals one automatic Easy, Medium, and Hard goal; completed goals stack their score multipliers and award separate Cash bounties.
-- Every volley ends with a receipt. It shows direct, cascade, and boss score, completed goals, the stacked multiplier, and Cash bounties; tap it to skip the animation safely.
+- Breaking or cutting chips retains its normal **Cash** payout and also adds the chip's starting HP to **Score**; actual boss damage adds Score. Three automatic goals (Easy, Medium, Hard) appear in a dedicated strip between your jokers and the board with on-board ⌖/row markers; completed goals stack their score multipliers and award separate Cash bounties.
+- Each volley displays a non-blocking score banner. Tap the score stat to reveal a 'Last volley' breakdown showing direct, cascade, and boss score, completed goals, the stacked multiplier, and Cash bounties.
 
 ## Tables & Win Condition
 

@@ -88,15 +88,40 @@
   @keyframes clineIn{to{opacity:1;transform:none}}
   .toast{position:absolute;top:10px;left:50%;transform:translateX(-50%) translateY(-40px);opacity:0;background:rgba(0,0,0,.75);border:1px solid var(--gold);border-radius:12px;padding:8px 16px;font-size:13px;z-index:20;pointer-events:none;transition:transform .3s ease,opacity .3s ease;}
   .toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
-  #goals{position:absolute;left:8px;right:8px;top:4px;z-index:4;display:flex;gap:4px;pointer-events:none;justify-content:center;}
-  .goal{font:700 9px var(--num);letter-spacing:.3px;background:rgba(4,22,17,.78);border:1px solid rgba(242,193,78,.45);border-radius:8px;padding:4px 6px;color:var(--cream);}
+  #goals{display:flex;gap:4px;padding:2px 10px 6px;min-height:34px;justify-content:center;pointer-events:none;}
+  .goal{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1 1 0;max-width:170px;font:700 9px var(--num);letter-spacing:.1px;background:rgba(4,22,17,.78);border:1px solid rgba(242,193,78,.45);border-left:3px solid var(--tier,#8fa8a0);border-radius:8px;padding:4px 6px;color:var(--cream);overflow:hidden;}
+  .goal .gt{display:flex;align-items:center;gap:3px;min-width:0;width:100%;}
+  .goal .gi{font-size:11px;flex:none;line-height:1;}
+  .goal .gl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;}
+  .goal .gv{font-family:var(--num);font-size:9px;opacity:.85;align-self:flex-end;line-height:1;}
   .goal.done{background:rgba(47,143,91,.9);border-color:#8fe0a8;}
+  .goal.pop{animation:goalPop .4s cubic-bezier(.2,1.5,.4,1);}
+  @keyframes goalPop{0%{transform:scale(1)}40%{transform:scale(1.18)}100%{transform:scale(1)}}
+  @media (prefers-reduced-motion: reduce){ .goal.pop{animation:none;} }
+  #scoreStat{cursor:pointer;}
+  #scoreStat .depthbar i{background:var(--gold);}
+  @keyframes goldFlash{0%,100%{filter:brightness(1)}50%{filter:brightness(1.7)}}
+  #scoreStat.quotamet .depthbar i{box-shadow:0 0 6px var(--gold);animation:goldFlash 1.1s ease infinite;}
+  @media (prefers-reduced-motion: reduce){ #scoreStat.quotamet .depthbar i{animation:none;} }
+  #volleyBanner{position:absolute;top:8px;left:50%;z-index:5;pointer-events:none;max-width:92%;
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;
+    background:rgba(4,22,17,.96);border:1px solid var(--gold-deep);border-radius:12px;padding:6px 12px;box-shadow:0 4px 14px rgba(0,0,0,.5);
+    font-family:var(--num);font-size:11px;opacity:0;transform:translate(-50%,-14px);
+    transition:opacity .25s ease, transform .25s ease;}
+  #volleyBanner.show{opacity:1;transform:translate(-50%,0);}
+  #volleyBanner.fade{opacity:0;transform:translate(-50%,-6px);}
+  #volleyBanner .vb-base{opacity:.8;}
+  #volleyBanner .vb-gain{color:var(--gold);font-weight:700;}
+  #volleyBanner .vb-goal{background:rgba(47,143,91,.35);border:1px solid #8fe0a8;border-radius:8px;padding:2px 6px;font-size:10px;white-space:nowrap;}
+  #volleyBanner .vb-cash{color:#f2c14e;font-weight:700;}
+  @media (prefers-reduced-motion: reduce){ #volleyBanner{transition:opacity .15s ease;transform:translate(-50%,0) !important;} }
 </style>
 </head>
 <body>
   <div id="top">
     <div class="stat coins"><b id="coins">0</b><span>Cash</span></div>
-    <div class="stat"><b id="score">0/300</b><span>Table score</span></div>
+    <div class="stat" id="scoreStat"><b id="score">0/300</b><span>Table score</span>
+      <div class="depthbar"><i id="scoreBarFill"></i></div></div>
     <div class="stat depth" id="depthStat"><b id="depthLine">1/6</b><span id="depthLabel">Penny Slots</span>
       <div class="depthbar"><i id="depthBarFill"></i></div></div>
     <div class="stat"><b id="balls">4</b><span>Balls</span></div>
@@ -106,14 +131,17 @@
 
   <div id="hand"></div>
 
+  <div id="goals" aria-live="polite"></div>
+
   <div id="stage">
     <canvas id="cv"></canvas>
-    <div id="goals" aria-live="polite"></div>
+
+    <div id="volleyBanner" aria-hidden="true"></div>
 
     <div class="ov" id="receiptOv">
-      <div class="title" style="font-size:min(10vw,44px)">VOLLEY SCORED</div>
+      <div class="title" style="font-size:min(10vw,44px)">LAST VOLLEY</div>
       <div class="cashout-lines" id="receiptLines"></div>
-      <div class="tag">Tap to continue</div>
+      <div class="tag">Tap to close</div>
     </div>
 
     <div class="ov show" id="startOv">
@@ -195,6 +223,7 @@ function beep(freq,dur,type,vol){ if(muted||!AC)return; const t=AC.currentTime,o
 function sHit(c){ beep(300+Math.min(c,20)*26,.05,'triangle',.13); }
 function sPop(){ beep(150,.12,'sawtooth',.12); beep(90,.14,'sine',.1); }
 function sCoin(){ beep(880,.05,'square',.12); setTimeout(()=>beep(1180,.06,'square',.12),40); }
+function sChime(){ beep(1046,.05,'sine',.14); setTimeout(()=>beep(1568,.07,'sine',.12),50); }
 function sLaunch(){ beep(520,.08,'sine',.12); }
 function sBall(){ beep(1400,.07,'square',.16); setTimeout(()=>beep(1760,.09,'square',.16),60); }
 function sBoss(){ [220,180,140].forEach((f,i)=>setTimeout(()=>beep(f,.3,'sawtooth',.2),i*90)); }
@@ -440,7 +469,7 @@ const G={ screen:'start', coins:0, turn:1, best:0, jokers:[], blocks:[], balls:[
   timeScale:1, manualSpeed:false, flightIdle:0, hitStop:0, firstReturnX:null, shake:0, shopVisits:0, bonusBalls:0, rerollCost:3, offers:[],
   jstate:{}, stats:{broken:0}, bossMod:null, tollThisLaunch:0, _died:false,
   table:1, roundInTable:1, totalVolleys:0, bossVolleys:0, collectionVolleys:0, bossOvertime:false, nextBlockId:1, tstats:{broken:0,cut:0,crits:0}, pendingCashout:null, hasWon:false, bossMod2:null,
-  tableScore:0, runScore:0, tableQuota:300, activeGoals:[], volley:null, phase:'aim', volleyId:0, bossKilled:false, detachesThisTable:0,
+  tableScore:0, runScore:0, tableQuota:300, activeGoals:[], volley:null, lastVolley:null, phase:'aim', volleyId:0, bossKilled:false, detachesThisTable:0,
   brokenThisTurn:0, cutThisTurn:0, coinsThisTurn:0,
   newUnlocksThisRun:[], bossKillsThisRun:0, launchesThisRun:0, peakCoinsThisRun:0 };
 
@@ -448,7 +477,7 @@ function reset(){
   Object.assign(G,{coins:0,turn:1,roundInTable:1,totalVolleys:0,bossVolleys:0,collectionVolleys:0,bossOvertime:false,nextBlockId:1,jokers:[],blocks:[],balls:[],queue:[],launchX:boardLeft+boardSize/2,dir:null,aiming:false,
     particles:[],floats:[],coinfx:[],destroyedThisTurn:0,timeScale:1,manualSpeed:false,flightIdle:0,hitStop:0,firstReturnX:null,fireTimer:0,
     shake:0,shopVisits:0,bonusBalls:0,rerollCost:3,offers:[],jstate:{},stats:{broken:0},bossMod:null,tollThisLaunch:0,ballIdx:0,_died:false,
-    bossMod2:null,pendingCashout:null,hasWon:false,brokenThisTurn:0,cutThisTurn:0,coinsThisTurn:0,tableScore:0,runScore:0,tableQuota:tableQuotaFor(1),activeGoals:[],volley:null,phase:'aim',volleyId:0,bossKilled:false,detachesThisTable:0,
+    bossMod2:null,pendingCashout:null,hasWon:false,brokenThisTurn:0,cutThisTurn:0,coinsThisTurn:0,tableScore:0,runScore:0,tableQuota:tableQuotaFor(1),activeGoals:[],volley:null,lastVolley:null,phase:'aim',volleyId:0,bossKilled:false,detachesThisTable:0,
     newUnlocksThisRun:[],bossKillsThisRun:0,launchesThisRun:0,peakCoinsThisRun:0});
   beginTable(1);
   renderHand(); syncTop();
@@ -538,6 +567,7 @@ function bossGeom(b){ const hw=boardSize*0.47, hh=b.rowSpan*cellH*0.44, cx=board
 /* ---------- score goals ---------- */
 function goal(tier,id,label,bonus,cash,extra){ return Object.assign({tier,id,label,bonus,cash,done:false},extra||{}); }
 function generateGoals(){
+  G._poppedGoals=new Set();
   const chips=G.blocks.filter(b=>!b.dead&&b.type==='chip'&&!b.boss), danger=chips.find(b=>b.row>=SAFE_ROWS-2);
   const hittable=chips.length||G.blocks.some(b=>b.boss&&!b.dead);
   if(!hittable){ G.activeGoals=[]; renderGoals(); return; }
@@ -550,21 +580,22 @@ function generateGoals(){
   }
   // These are selected from a board snapshot. Positional goals retain stable IDs/rows,
   // so later descents and support removals cannot change what qualified.
+  const targetLimit=5;
   const easy=[];
-  if(chips.length)easy.push(goal('easy','pinball','Pinball: 8 impacts',.25,1,{need:8}));
-  if(chips.length>=2)easy.push(goal('easy','break2','Break 2 chips',.25,1,{need:2}));
-  if(danger)easy.push(goal('easy','danger','Clear target '+danger.id,.25,1,{targetIds:[danger.id]}));
+  if(chips.length)easy.push(goal('easy','pinball','8 impacts',.25,1,{need:8}));
+  if(chips.length>=2)easy.push(goal('easy','break2','Break 2',.25,1,{need:2}));
+  if(danger)easy.push(goal('easy','danger','Clear ⌖',.25,1,{targetIds:[danger.id]}));
   const medium=[];
   if(chips.length)medium.push(goal('medium','bank','Bank break',.5,2,{need:1}));
-  if(cutPotential>=2)medium.push(goal('medium','cut2','Cut 2 chips',.5,2,{need:2}));
-  if(marked!=null)medium.push(goal('medium','sweep','Sweep row '+(marked+1),.5,2,{row:marked,targetIds:chips.filter(b=>b.row===marked).map(b=>b.id)}));
+  if(cutPotential>=2)medium.push(goal('medium','cut2','Cut 2',.5,2,{need:2}));
+  if(marked!=null)medium.push(goal('medium','sweep','Sweep ⌖ row',.5,2,{row:marked,targetIds:chips.filter(b=>b.row===marked).map(b=>b.id)}));
   const hard=[];
-  if(chips.length)hard.push(goal('hard','doublebank','Double-bank break',.75,3,{need:2}));
-  if(cutPotential>=4)hard.push(goal('hard','cut4','Cut 4 chips',.75,3,{need:4}));
-  if(target)hard.push(goal('hard','target','Hit target '+target.id+' within first 5 impacts',.75,3,{targetIds:[target.id],limit:5}));
-  if(!easy.length)easy.push(goal('easy','hit_easy','Make 2 hits',.25,1,{need:2}));
-  if(!medium.length)medium.push(goal('medium','hit_medium','Make 5 hits',.5,2,{need:5}));
-  if(!hard.length)hard.push(goal('hard','hit_hard','Make 8 hits',.75,3,{need:8}));
+  if(chips.length)hard.push(goal('hard','doublebank','2-bank break',.75,3,{need:2}));
+  if(cutPotential>=4)hard.push(goal('hard','cut4','Cut 4',.75,3,{need:4}));
+  if(target)hard.push(goal('hard','target','⌖ within '+targetLimit,.75,3,{targetIds:[target.id],limit:targetLimit}));
+  if(!easy.length)easy.push(goal('easy','hit_easy','2 hits',.25,1,{need:2}));
+  if(!medium.length)medium.push(goal('medium','hit_medium','5 hits',.5,2,{need:5}));
+  if(!hard.length)hard.push(goal('hard','hit_hard','8 hits',.75,3,{need:8}));
   G.activeGoals=[easy[Math.floor(Math.random()*easy.length)],medium[Math.floor(Math.random()*medium.length)],hard[Math.floor(Math.random()*hard.length)]];
   renderGoals();
 }
@@ -580,7 +611,7 @@ function awardScore(amount,kind,b){
   noteEvent('score',{kind,amount,id:b&&b.id});
 }
 function completeGoal(g){
-  if(!g||g.done||!G.volley)return; g.done=true; G.volley.completedGoals.push(g); G.volley.cashBounty+=g.cash; noteEvent('goal',{id:g.id}); renderGoals();
+  if(!g||g.done||!G.volley)return; g.done=true; G.volley.completedGoals.push(g); G.volley.cashBounty+=g.cash; noteEvent('goal',{id:g.id}); sChime(); renderGoals();
 }
 function evaluateGoals(type,b,ball){
   if(!G.volley)return;
@@ -598,7 +629,21 @@ function evaluateGoals(type,b,ball){
     else if(g.id.indexOf('hit_')===0 && v.impacts>=g.need)completeGoal(g);
   }
 }
-function renderGoals(){ const el=document.getElementById('goals'); if(!el)return; el.innerHTML=G.activeGoals.map(g=>'<span class="goal '+(g.done?'done':'')+'">'+(g.done?'✓ ':'')+g.label+' +'+Math.round(g.bonus*100)+'% · $'+g.cash+'</span>').join(''); }
+const GOAL_ICONS={danger:'⌖',target:'⌖',sweep:'🧹',pinball:'⚡',cut2:'✂',cut4:'✂',bank:'🏦',doublebank:'🏦',break2:'●'};
+function goalIcon(g){ return GOAL_ICONS[g.id]||'●'; }
+const TIER_COLORS={easy:'#8fa8a0',medium:'#4fb06a',hard:'#f2c14e'};
+function renderGoals(){
+  const el=document.getElementById('goals'); if(!el)return;
+  if(!G._poppedGoals)G._poppedGoals=new Set();
+  el.innerHTML=G.activeGoals.map(g=>{
+    const justPopped=g.done&&!G._poppedGoals.has(g.id)&&!reducedMotion.matches;
+    if(g.done)G._poppedGoals.add(g.id);
+    return '<span class="goal'+(g.done?' done':'')+(justPopped?' pop':'')+'" style="--tier:'+(TIER_COLORS[g.tier]||TIER_COLORS.easy)+'">'
+      +'<span class="gt"><i class="gi">'+(g.done?'✓':goalIcon(g))+'</i>'
+      +'<span class="gl">'+g.label+'</span></span>'
+      +'<span class="gv">+'+Math.round(g.bonus*100)+'% · $'+g.cash+'</span></span>';
+  }).join('');
+}
 
 /* ---------- flow ---------- */
 function fire(){
@@ -899,34 +944,57 @@ function wallHit(ball,top){
   if(top && count('kite')>0 && !ball._kited){ ball._kited=true; ball.dmg+=2; jokerProc('kite'); }
 }
 
-/* ---------- volley receipt ---------- */
-let receiptTimer=null;
+/* ---------- volley score banner + last-volley detail ---------- */
+let bannerTimer=null;
+function hideBanner(){ const el=document.getElementById('volleyBanner'); if(!el)return; clearTimeout(bannerTimer); el.classList.remove('show'); el.classList.add('fade'); }
+function showScoreBanner(v){
+  const el=document.getElementById('volleyBanner'); if(!el)return;
+  clearTimeout(bannerTimer);
+  if(!v.scoreGained && !v.cashBounty && !v.completedGoals.length){ el.classList.remove('show'); el.classList.add('fade'); return; }
+  let html='<span class="vb-base">base ×'+v.multiplier.toFixed(2)+'</span><span class="vb-gain">&rarr; +'+v.scoreGained+'</span>';
+  for(const g of v.completedGoals) html+='<span class="vb-goal">&check; '+g.label+' +'+Math.round(g.bonus*100)+'%</span>';
+  if(v.cashBounty) html+='<span class="vb-cash">$'+v.cashBounty+'</span>';
+  el.innerHTML=html; el.classList.remove('fade'); el.classList.add('show');
+  bannerTimer=setTimeout(()=>{ el.classList.remove('show'); el.classList.add('fade'); },reducedMotion.matches?1600:2200);
+}
+function animateTableScore(from,to){
+  const el=document.getElementById('score'), stat=document.getElementById('scoreStat');
+  if(stat&&stat.classList){ stat.classList.add('punch'); setTimeout(()=>{ if(stat.classList)stat.classList.remove('punch'); },320); }
+  if(!el)return;
+  const frames=reducedMotion.matches?1:28; let f=0;
+  (function step(){
+    f++; const p=Math.min(1,f/frames);
+    el.textContent=Math.round(from+(to-from)*p)+'/'+G.tableQuota;
+    if(p<1)requestAnimationFrame(step); else syncTop();
+  })();
+}
 function settleVolley(){
-  const v=G.volley; if(!v||v.settled)return; v.settled=true; G.phase='settling';
+  const v=G.volley; if(!v||v.settled)return; v.settled=true;
   const mult=1+v.completedGoals.reduce((n,g)=>n+g.bonus,0), base=v.breakScore+v.cascadeScore+v.bossDamageScore;
   v.baseScore=base; v.multiplier=mult; v.scoreGained=Math.round(base*mult);
-  G.tableScore+=v.scoreGained; G.runScore+=v.scoreGained; syncTop(); showReceipt(v);
+  const prevScore=G.tableScore;
+  G.tableScore+=v.scoreGained; G.runScore+=v.scoreGained;
+  if(v.cashBounty)addCoins(v.cashBounty,W/2,playTop+cellH,true);
+  G.lastVolley={baseScore:v.baseScore,breakScore:v.breakScore,cascadeScore:v.cascadeScore,bossDamageScore:v.bossDamageScore,
+    completedGoals:v.completedGoals.map(g=>({label:g.label,bonus:g.bonus,cash:g.cash})),multiplier:v.multiplier,scoreGained:v.scoreGained,cashBounty:v.cashBounty};
+  syncTop(); animateTableScore(prevScore,G.tableScore); showScoreBanner(G.lastVolley);
+  G.phase='transition'; endTurn();
 }
-function showReceipt(v){
-  const el=document.getElementById('receiptLines');
+function renderLastVolleyLines(){
+  const el=document.getElementById('receiptLines'); if(!el)return;
+  const v=G.lastVolley;
+  if(!v){ el.innerHTML='<div class="cline" style="animation-delay:0ms">No volley yet<span></span></div>'; return; }
   const rows=[['Direct breaks',v.breakScore],['Cascade score',v.cascadeScore],['Boss damage',v.bossDamageScore]];
   for(const g of v.completedGoals)rows.push([g.label+' +'+Math.round(g.bonus*100)+'%', '$'+g.cash]);
   rows.push(['Multiplier','×'+v.multiplier.toFixed(2)],['Score gained',v.scoreGained],['Cash bounties','$'+v.cashBounty]);
   el.innerHTML=rows.map((r,i)=>'<div class="cline" style="animation-delay:'+(i*70)+'ms">'+r[0]+'<span>'+r[1]+'</span></div>').join('');
-  document.getElementById('receiptOv').classList.add('show'); G.phase='receipt';
-  const duration=Math.min(1400,900+v.completedGoals.length*120+(v.cascadeScore>=5?180:0));
-  clearTimeout(receiptTimer); const id=v.id; receiptTimer=setTimeout(()=>finishReceipt(id),duration);
 }
-function finishReceipt(id){
-  const v=G.volley; if(!v||v.id!==id||v.receiptDone)return; v.receiptDone=true; clearTimeout(receiptTimer);
-  document.getElementById('receiptOv').classList.remove('show');
-  if(v.cashBounty)addCoins(v.cashBounty,W/2,playTop+cellH,true);
-  G.phase='transition'; endTurn();
-}
-function skipReceipt(){ if(G.phase==='receipt'&&G.volley)finishReceipt(G.volley.id); }
+function openLastVolley(){ if(G.phase!=='aim')return; renderLastVolleyLines(); const ov=document.getElementById('receiptOv'); if(ov&&ov.classList)ov.classList.add('show'); }
+function closeLastVolley(){ const ov=document.getElementById('receiptOv'); if(ov&&ov.classList)ov.classList.remove('show'); }
 const receiptOv=document.getElementById('receiptOv');
-receiptOv.addEventListener('pointerdown',e=>{ if(e&&e.preventDefault)e.preventDefault(); skipReceipt(); });
-receiptOv.addEventListener('click',skipReceipt);
+receiptOv.addEventListener('pointerdown',e=>{ if(e&&e.preventDefault)e.preventDefault(); closeLastVolley(); });
+const scoreStatEl=document.getElementById('scoreStat');
+if(scoreStatEl&&scoreStatEl.addEventListener)scoreStatEl.addEventListener('pointerdown',e=>{ if(e&&e.stopPropagation)e.stopPropagation(); openLastVolley(); });
 
 /* ---------- loop ---------- */
 let last=performance.now();
@@ -1111,7 +1179,7 @@ function draw(){
   ctx.beginPath(); ctx.moveTo(boardLeft,dangerY); ctx.lineTo(boardRight,dangerY); ctx.stroke(); ctx.setLineDash([]);
 
   const liveGoals=G.activeGoals.filter(g=>!g.done), markedIds=new Set();
-  for(const g of liveGoals) if(g.id==='danger'||g.id==='target') for(const id of g.targetIds||[])markedIds.add(id);
+  for(const g of liveGoals) if(g.id==='danger'||g.id==='target'||g.id==='sweep') for(const id of g.targetIds||[])markedIds.add(id);
   for(const g of liveGoals) if(g.id==='sweep'){
     const y=playTop+g.row*cellH;
     ctx.fillStyle='rgba(242,193,78,.12)'; ctx.fillRect(boardLeft,y,boardSize,cellH);
@@ -1245,7 +1313,7 @@ function aimWithinBoard(x,r){ return x>=boardLeft+r&&x<=boardRight-r; }
 
 /* ---------- input ---------- */
 function pos(e){ const r=cv.getBoundingClientRect(); return {x:e.clientX-r.left,y:e.clientY-r.top}; }
-function down(e){ initAudio(); if(G.phase==='receipt'){ e.preventDefault(); skipReceipt(); return; } if(G.screen!=='play')return; e.preventDefault();
+function down(e){ initAudio(); if(G.screen!=='play')return; e.preventDefault();
   if(G.balls.length||G.queue.length){ G.manualSpeed=!G.manualSpeed; G.timeScale=G.manualSpeed?3:1; G.flightIdle=0; return; }
   G.aiming=true; G.activePointer=e.pointerId; if(cv.setPointerCapture)cv.setPointerCapture(e.pointerId); setAim(pos(e)); }
 function move(e){ if(!G.aiming||e.pointerId!==G.activePointer)return; e.preventDefault(); setAim(pos(e)); }
@@ -1273,7 +1341,11 @@ function jokerProc(id){ const now=performance.now();
 }
 function punchCoins(){ const el=document.getElementById('coins'), wrap=el&&el.parentElement; if(!wrap||!wrap.classList)return;
   wrap.classList.add('punch'); setTimeout(()=>wrap.classList.remove('punch'),320); }
-function syncTop(){ document.getElementById('coins').textContent=G.coins; document.getElementById('balls').textContent=ballCount(); const s=document.getElementById('score'); if(s)s.textContent=G.tableScore+'/'+G.tableQuota; }
+function syncTop(){ document.getElementById('coins').textContent=G.coins; document.getElementById('balls').textContent=ballCount(); const s=document.getElementById('score'); if(s)s.textContent=G.tableScore+'/'+G.tableQuota;
+  const stat=document.getElementById('scoreStat'), fill=document.getElementById('scoreBarFill');
+  if(fill)fill.style.width=Math.max(0,Math.min(100,G.tableQuota>0?100*G.tableScore/G.tableQuota:0))+'%';
+  if(stat&&stat.classList)stat.classList.toggle('quotamet',G.tableScore>=G.tableQuota);
+}
 function syncDepth(){
   const line=document.getElementById('depthLine'), label=document.getElementById('depthLabel'),
     fill=document.getElementById('depthBarFill'), stat=document.getElementById('depthStat');
@@ -1317,7 +1389,7 @@ function buildOffers(){ G.offers=[];
   for(let i=0;i<n;i++)G.offers.push(pickOffer(hs&&i===0,i===biasSlot?bias:null,G.offers));
   renderShop();
 }
-function openShop(){ G.screen='shop'; G.phase='transition'; G.shopVisits++;
+function openShop(){ hideBanner(); G.screen='shop'; G.phase='transition'; G.shopVisits++;
   if(count('investor')>0){ G.jstate.inv=(G.jstate.inv||0)+1; jokerProc('investor'); }
   G.jstate.usedFreeReroll=false;
   G.rerollCost=Math.min(11,3+Math.floor(G.shopVisits/2)); buildOffers(); shopOv.classList.add('show'); }
@@ -1390,6 +1462,7 @@ function showCashout(tally){
   document.getElementById('cashoutOv').classList.add('show');
 }
 function enterCashout(){
+  hideBanner();
   const tally=computeCashoutTally();
   G.pendingCashout=null;
   syncTop();
@@ -1397,6 +1470,7 @@ function enterCashout(){
   G.screen='cashout'; G.phase='transition'; showCashout(tally);
 }
 function enterWon(){
+  hideBanner();
   G.hasWon=true; G.screen='won';
   checkAchievements({won:true});
   document.getElementById('wonFinalTable').textContent=G.table;
@@ -1414,7 +1488,7 @@ document.getElementById('newRunBtn').onclick=()=>{
   document.getElementById('wonOv').classList.remove('show'); G.screen='play'; reset();
 };
 
-function gameOver(){ G.screen='over'; sOver(); G.best=Math.max(G.best,G.coins);
+function gameOver(){ hideBanner(); G.screen='over'; sOver(); G.best=Math.max(G.best,G.coins);
   META.bestTable=Math.max(META.bestTable,G.table); META.bestTurn=Math.max(META.bestTurn,G.turn);
   META.bestCoins=Math.max(META.bestCoins,G.coins); saveMeta();
   document.getElementById('finalRound').textContent=G.turn; document.getElementById('finalCoins').textContent=G.coins;

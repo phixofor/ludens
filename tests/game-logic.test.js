@@ -62,7 +62,7 @@ sandbox.globalThis = sandbox;
 
 const instrumented = scriptMatch[1].replace(
   "resize(); renderHand(); requestAnimationFrame(loop);",
-  "globalThis.__game={G,bossAlive,breakBlock,detachChip,sellValue,refreshShop,renderShop,reset,CARDS,count,ballCount,ballDmg,coinMult,wallHit,spawnRow,spawnBoss,endTurn,hitBlock,cardPrice,buildOffers,bossGeom,checkSupport,checkLoss,critChance,pierceChance,baseHpAt,newBlock,ballPackPrice,rerollPrice,openShop,update,fire,resize,bx,by,tableClearBonus,tableQuotaFor,beginTable,enterCashout,computeCashoutTally,loadMeta,saveMeta,clearMeta,isUnlocked,checkAchievements,LOCKED_JOKERS,tableName,pickOffer,storageGet,storageSet,META_KEY,LEGACY_META_KEY,advanceToNextTable,effectiveDifficultyRound,analyzeSupport,cachedSupportAnalysis,completeVolley,spawnBall,geometrySnapshot,aimWithinBoard,startVolley,settleVolley,finishReceipt,skipReceipt,generateGoals,evaluateGoals};"
+  "globalThis.__game={G,bossAlive,breakBlock,detachChip,sellValue,refreshShop,renderShop,reset,CARDS,count,ballCount,ballDmg,coinMult,wallHit,spawnRow,spawnBoss,endTurn,hitBlock,cardPrice,buildOffers,bossGeom,checkSupport,checkLoss,critChance,pierceChance,baseHpAt,newBlock,ballPackPrice,rerollPrice,openShop,update,fire,resize,bx,by,tableClearBonus,tableQuotaFor,beginTable,enterCashout,computeCashoutTally,loadMeta,saveMeta,clearMeta,isUnlocked,checkAchievements,LOCKED_JOKERS,tableName,pickOffer,storageGet,storageSet,META_KEY,LEGACY_META_KEY,advanceToNextTable,effectiveDifficultyRound,analyzeSupport,cachedSupportAnalysis,completeVolley,spawnBall,geometrySnapshot,aimWithinBoard,startVolley,settleVolley,openLastVolley,closeLastVolley,generateGoals,evaluateGoals};"
 );
 assert.notEqual(instrumented, scriptMatch[1], "game script test hook was installed");
 vm.runInNewContext(instrumented, sandbox);
@@ -75,7 +75,7 @@ const {
   tableClearBonus, beginTable, enterCashout, computeCashoutTally, loadMeta, saveMeta, clearMeta,
   isUnlocked, checkAchievements, LOCKED_JOKERS, tableName, pickOffer, storageGet, storageSet, META_KEY, LEGACY_META_KEY, advanceToNextTable,
   effectiveDifficultyRound, analyzeSupport, cachedSupportAnalysis, completeVolley, spawnBall, geometrySnapshot, aimWithinBoard,
-  tableQuotaFor, startVolley, settleVolley, finishReceipt, skipReceipt, generateGoals, evaluateGoals, detachChip,
+  tableQuotaFor, startVolley, settleVolley, openLastVolley, closeLastVolley, generateGoals, evaluateGoals, detachChip,
 } = sandbox.__game;
 
 resize();
@@ -871,9 +871,8 @@ assert.ok(Object.values(CARDS).every(c=>Array.isArray(c.tags)&&c.tags.length),'a
   reset();
   Object.assign(G,{screen:'play',phase:'flight',totalVolleys:6,turn:7,bossKilled:true,tableScore:0,tableQuota:999,blocks:[],balls:[{x:175,y:999,vx:0,vy:0,r:5,_collected:true}],queue:[],firstReturnX:175,coins:0,coinfx:[],volley:{id:1,events:[],breakScore:0,cascadeScore:0,bossDamageScore:0,completedGoals:[],cashBounty:0,settled:false}});
   update(0.016);
-  assert.equal(G.totalVolleys,6,"a volley is not advanced until its receipt settles");
-  assert.equal(G.phase,'receipt',"every volley, including zero-score, shows a receipt");
-  skipReceipt();
+  assert.equal(G.totalVolleys,7,"a settled volley advances immediately, without waiting on a blocking receipt");
+  assert.equal(G.phase,'aim',"even a zero-score volley resolves straight back to aiming");
 }
 
 /* ---------- Phase 2: score ledger, goals, receipts, collection overtime ---------- */
@@ -919,8 +918,7 @@ assert.ok(Object.values(CARDS).every(c=>Array.isArray(c.tags)&&c.tags.length),'a
   assert.equal(G.volley.breakScore,9,"a direct chip contributes starting HP exactly once");
   assert.equal(G.coins,11,"Cash payout remains independent from the score ledger");
   settleVolley(); settleVolley();
-  assert.equal(G.tableScore,9,"receipt settlement is idempotent");
-  finishReceipt(G.volley.id);
+  assert.equal(G.tableScore,9,"volley settlement is idempotent");
 }
 {
   Object.assign(G,{coins:0,jokers:['midas'],tableScore:0,runScore:0,activeGoals:[],particles:[],floats:[],coinfx:[],destroyedThisTurn:0,stats:{broken:0},tstats:{broken:0,cut:0,crits:0}});
@@ -934,16 +932,53 @@ assert.ok(Object.values(CARDS).every(c=>Array.isArray(c.tags)&&c.tags.length),'a
   startVolley(); Object.assign(G.volley,{breakScore:10,completedGoals:[{label:'A',bonus:.25,cash:1},{label:'B',bonus:.5,cash:2}],cashBounty:3});
   settleVolley();
   assert.equal(G.tableScore,18,'stacked goal multiplier rounds the score once');
-  assert.equal(G.coins,5,'goal Cash bounty waits for receipt settlement');
-  assert.equal(G.phase,'receipt'); assert.equal(getElement('receiptOv').classList.contains('show'),true,'receipt DOM is visible');
-  assert.ok((getElement('receiptOv')._listeners.pointerdown||[]).length>0,'receipt overlay owns its pointer skip listener');
-  assert.ok((getElement('receiptOv')._listeners.click||[]).length>0,'receipt overlay owns its click skip listener');
-  const id=G.volley.id; getElement('receiptOv').dispatchEvent({type:'pointerdown',preventDefault(){}});
-  const settled={coins:G.coins,totalVolleys:G.totalVolleys,phase:G.phase,screen:G.screen};
-  assert.equal(G.coins,8,'fixed bounty becomes Cash after receipt');
-  assert.equal(getElement('receiptOv').classList.contains('show'),false,'receipt DOM hides after skip');
-  finishReceipt(id);
-  assert.deepEqual({coins:G.coins,totalVolleys:G.totalVolleys,phase:G.phase,screen:G.screen},settled,'natural timer and skip converge on identical idempotent state');
+  assert.equal(G.coins,8,'goal Cash bounty pays out immediately at settlement, no receipt to wait on');
+  assert.equal(G.phase,'aim','the volley settles straight back into aiming, no blocking receipt phase');
+  assert.deepEqual(G.lastVolley.completedGoals.map(g=>g.label),['A','B'],'the last-volley breakdown records completed goals');
+  assert.equal(G.lastVolley.scoreGained,18,'the last-volley breakdown records the score gained');
+  assert.equal(getElement('receiptOv').classList.contains('show'),false,'the last-volley modal stays closed until tapped');
+  openLastVolley();
+  assert.equal(getElement('receiptOv').classList.contains('show'),true,'tapping the score stat opens the last-volley detail');
+  assert.ok((getElement('receiptOv')._listeners.pointerdown||[]).length>0,'the detail modal owns its close-on-tap listener');
+  getElement('receiptOv').dispatchEvent({type:'pointerdown',preventDefault(){}});
+  assert.equal(getElement('receiptOv').classList.contains('show'),false,'a tap anywhere on the modal closes it');
+}
+{
+  // banner suppression: a zero-score, zero-bounty, no-goals volley never shows the score banner
+  Object.assign(G,{screen:'play',phase:'flight',coins:0,jokers:[],table:1,roundInTable:1,bossKilled:false,bossOvertime:false,tableScore:0,runScore:0,blocks:[],activeGoals:[],particles:[],floats:[],coinfx:[]});
+  startVolley();
+  getElement('volleyBanner').classList.add('show');
+  settleVolley();
+  assert.equal(getElement('volleyBanner').classList.contains('show'),false,'a zero-score, zero-bounty, no-goal volley suppresses the score banner');
+}
+{
+  // banner appears for a scoring volley
+  Object.assign(G,{screen:'play',phase:'flight',coins:0,jokers:[],table:1,roundInTable:1,bossKilled:false,bossOvertime:false,tableScore:0,runScore:0,blocks:[],activeGoals:[],particles:[],floats:[],coinfx:[]});
+  startVolley(); Object.assign(G.volley,{breakScore:5});
+  settleVolley();
+  assert.equal(getElement('volleyBanner').classList.contains('show'),true,'a non-zero volley shows the score banner');
+}
+{
+  // settleVolley idempotence covers the cash bounty too: a double call pays the bounty exactly once
+  Object.assign(G,{screen:'play',phase:'flight',coins:0,jokers:[],table:1,roundInTable:1,bossKilled:false,bossOvertime:false,tableScore:0,runScore:0,blocks:[],activeGoals:[],particles:[],floats:[],coinfx:[]});
+  startVolley(); Object.assign(G.volley,{breakScore:4,cashBounty:5});
+  settleVolley(); settleVolley();
+  assert.equal(G.coins,5,'a double settleVolley call pays the cash bounty exactly once, immediately at settlement');
+  assert.equal(G.tableScore,4,'a double settleVolley call adds score exactly once');
+}
+{
+  // openLastVolley is phase-gated: it must never open the detail modal mid-flight
+  closeLastVolley();
+  Object.assign(G,{phase:'flight'});
+  openLastVolley();
+  assert.equal(getElement('receiptOv').classList.contains('show'),false,'openLastVolley refuses to open while phase is flight');
+  Object.assign(G,{phase:'settling'});
+  openLastVolley();
+  assert.equal(getElement('receiptOv').classList.contains('show'),false,'openLastVolley refuses to open while phase is settling');
+  Object.assign(G,{phase:'aim'});
+  openLastVolley();
+  assert.equal(getElement('receiptOv').classList.contains('show'),true,'openLastVolley opens once phase returns to aim');
+  closeLastVolley();
 }
 {
   Object.assign(G,{screen:'play',phase:'transition',table:1,roundInTable:2,bossKilled:false,bossOvertime:false,blocks:[],jokers:[],coins:0,shopVisits:0,floats:[],coinfx:[]});

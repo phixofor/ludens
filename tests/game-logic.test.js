@@ -58,7 +58,7 @@ sandbox.globalThis = sandbox;
 
 const instrumented = scriptMatch[1].replace(
   "resize(); renderHand(); requestAnimationFrame(loop);",
-  "globalThis.__game={G,bossAlive,breakBlock,sellValue,refreshShop,renderShop,reset,CARDS,count,ballCount,ballDmg,coinMult,wallHit,spawnRow,spawnBoss,endTurn,hitBlock,cardPrice,buildOffers,bossGeom,checkSupport,critChance,pierceChance,baseHpAt,newBlock,ballPackPrice,rerollPrice,openShop,update,fire,resize,bx,by};"
+  "globalThis.__game={G,bossAlive,breakBlock,sellValue,refreshShop,renderShop,reset,CARDS,count,ballCount,ballDmg,coinMult,wallHit,spawnRow,spawnBoss,endTurn,hitBlock,cardPrice,buildOffers,bossGeom,checkSupport,critChance,pierceChance,baseHpAt,newBlock,ballPackPrice,rerollPrice,openShop,update,fire,resize,bx,by,tableClearBonus,beginTable,enterCashout,computeCashoutTally,loadMeta,saveMeta,clearMeta,isUnlocked,checkAchievements,LOCKED_JOKERS,tableName,pickOffer,storageGet,storageSet,META_KEY,advanceToNextTable};"
 );
 assert.notEqual(instrumented, scriptMatch[1], "game script test hook was installed");
 vm.runInNewContext(instrumented, sandbox);
@@ -68,6 +68,8 @@ const {
   CARDS, count, ballCount, ballDmg, coinMult, wallHit,
   spawnRow, spawnBoss, endTurn, hitBlock, cardPrice, buildOffers, bossGeom, checkSupport,
   critChance, pierceChance, baseHpAt, newBlock, ballPackPrice, rerollPrice, openShop, update, fire, resize, bx, by,
+  tableClearBonus, beginTable, enterCashout, computeCashoutTally, loadMeta, saveMeta, clearMeta,
+  isUnlocked, checkAchievements, LOCKED_JOKERS, tableName, pickOffer, storageGet, storageSet, META_KEY, advanceToNextTable,
 } = sandbox.__game;
 
 resize();
@@ -554,6 +556,142 @@ for (const id of cardIds) assert.ok(validRar.has(CARDS[id].rar), `${id} has a va
   const ball = { x: bx(b), y: by(b), vx: 3, vy: 4, r: 2, dmg: 5, idx: 0, anchor: false };
   withConstantRandom(0.99, () => hitBlock(ball, b));
   assert.ok(ball.vx !== 3 || ball.vy !== 4, "pierce roll over 8%: ball bounces (velocity reflected, not preserved)");
+}
+
+/* ---------- double-boss guard: a surviving boss never gets a second boss stacked ---------- */
+{
+  Object.assign(G, { turn: 23, jokers: [], coins: 0, shopVisits: 0, floats: [], coinfx: [],
+    blocks: [{ boss: true, dead: false, row: 0, rowSpan: 2, hp: 50, armor: 1, dispRow: 0 }] });
+  endTurn();
+  assert.equal(G.turn, 24, "endTurn advances the turn counter");
+  const bosses = G.blocks.filter(b => b.boss);
+  assert.equal(bosses.length, 1, "a surviving boss at the turn-24 boundary must not spawn a second boss");
+}
+
+/* ---------- two boss mods at num>=5, none below the threshold ---------- */
+{
+  Object.assign(G, { turn: 60, blocks: [] });
+  withRandomSeq([0.3, 0.1], () => spawnBoss());
+  assert.ok(G.bossMod2, "boss number 5 (turn 60) rolls a second mod");
+  assert.notEqual(G.bossMod2, G.bossMod, "the two boss mods are always distinct");
+}
+{
+  Object.assign(G, { turn: 48, blocks: [] });
+  withRandomSeq([0.1], () => spawnBoss());
+  assert.equal(G.bossMod2, null, "boss number 4 (turn 48) stays below the two-mod threshold");
+}
+
+/* ---------- cash-out: boss-kill bonus + tally math ---------- */
+{
+  clearMeta();
+  Object.assign(G, { table: 3, tstats: { broken: 5, cut: 2, crits: 1 }, pendingCashout: null, coins: 0,
+    jokers: [], particles: [], floats: [], coinfx: [], destroyedThisTurn: 0, stats: { broken: 0 },
+    bossKillsThisRun: 0, bossMod: null, bossMod2: null, blocks: [], newUnlocksThisRun: [] });
+  const boss = { boss: true, dead: false, hp: 0, maxhp: 100, reward: 20, row: 0, rowSpan: 2, dispRow: 0, col: 0, cw: 1, chh: 1 };
+  breakBlock(boss, null);
+  assert.ok(G.pendingCashout, "boss death sets pendingCashout");
+  const expectedBonus = Math.round(20 * coinMult());
+  assert.equal(G.pendingCashout.bossBonus, expectedBonus, "bossBonus equals the computed coin value from the kill");
+  const tally = computeCashoutTally();
+  assert.equal(tally.broken, G.tstats.broken);
+  assert.equal(tally.cut, G.tstats.cut);
+  assert.equal(tally.crits, G.tstats.crits);
+  assert.equal(tally.bossBonus, G.pendingCashout.bossBonus);
+  assert.equal(tally.clearBonus, tableClearBonus(G.table), "computeCashoutTally's clearBonus matches tableClearBonus(G.table)");
+  clearMeta();
+}
+
+/* ---------- enterCashout: consumes pendingCashout, banks the clear bonus, advances turn ---------- */
+{
+  Object.assign(G, { table: 2, turn: 9, tstats: { broken: 3, cut: 1, crits: 0 }, pendingCashout: { bossBonus: 15 },
+    coins: 100, screen: 'play', coinfx: [] });
+  enterCashout();
+  assert.equal(G.turn, 10, "enterCashout increments turn");
+  assert.equal(G.screen, 'cashout', "enterCashout switches to the cashout screen");
+  assert.equal(G.pendingCashout, null, "pendingCashout is consumed");
+  assert.equal(G.coins, 100 + tableClearBonus(2), "the table clear bonus is banked");
+}
+
+/* ---------- beginTable: authoritative table state + per-table stat reset ---------- */
+{
+  Object.assign(G, { table: 1, blocks: [], turn: 1 });
+  beginTable(3);
+  assert.equal(G.table, 3, "beginTable sets G.table");
+  assert.equal(JSON.stringify(G.tstats), JSON.stringify({ broken: 0, cut: 0, crits: 0 }), "beginTable resets per-table stats");
+}
+
+/* ---------- WON guard: table 8 clear shows won once; table 9 clear advances without re-showing it ---------- */
+{
+  clearMeta();
+  Object.assign(G, { table: 8, hasWon: false, screen: 'cashout', turn: 90, coins: 50,
+    tstats: { broken: 0, cut: 0, crits: 0 }, pendingCashout: null, blocks: [], jokers: [],
+    particles: [], floats: [], coinfx: [], destroyedThisTurn: 0, stats: { broken: 0 },
+    bossMod: null, bossMod2: null, bossKillsThisRun: 0, newUnlocksThisRun: [] });
+  getElement('cashoutBtn').onclick();
+  assert.equal(G.screen, 'won', "first Table-8 clear shows the WON screen");
+  assert.equal(G.hasWon, true, "G.hasWon is set");
+
+  Object.assign(G, { table: 9, screen: 'cashout' });
+  getElement('cashoutBtn').onclick();
+  assert.equal(G.screen, 'play', "a later Table-9 clear advances straight into play, not WON again");
+  clearMeta();
+}
+
+/* ---------- pickOffer: locked jokers are never offered, cascade works from a legendary roll ---------- */
+{
+  clearMeta();
+  Object.assign(G, { jokers: [] });
+  const rollPairs = [
+    [0.99, 0.0], [0.99, 0.99], [0.9, 0.5], [0.6, 0.5], [0.1, 0.5], [0.99, 0.3], [0.95, 0.7],
+  ];
+  for (const [a, b] of rollPairs) {
+    const id = withRandomSeq([a, b], () => pickOffer());
+    assert.ok(id, "pickOffer always returns a card id");
+    assert.ok(!LOCKED_JOKERS.includes(id), `pickOffer must never return a locked joker (got ${id}) for rolls ${a},${b}`);
+  }
+  clearMeta();
+}
+
+/* ---------- unlock exactness: avalanche fires at exactly 500 lifetime breaks, not 499; unlock() is idempotent ---------- */
+{
+  clearMeta();
+  Object.assign(G, { jokers: [], destroyedThisTurn: 0, stats: { broken: 0 }, coins: 0, particles: [], floats: [],
+    coinfx: [], tstats: { broken: 0, cut: 0, crits: 0 }, bossMod: null, bossMod2: null, newUnlocksThisRun: [] });
+  const mkBlock = () => ({ boss: false, dead: false, row: 0, hp: 0, reward: 1, dispRow: 0, col: 0, cw: 1, chh: 1, kind: 'hex' });
+  for (let i = 0; i < 499; i++) breakBlock(mkBlock(), null);
+  assert.ok(!loadMeta().unlocked.avalanche, "499 lifetime breaks: avalanche stays locked");
+  breakBlock(mkBlock(), null); // 500th break
+  assert.ok(loadMeta().unlocked.avalanche, "exactly 500 lifetime breaks unlocks avalanche");
+  assert.equal(G.newUnlocksThisRun.filter(id => id === 'avalanche').length, 1, "avalanche is unlocked exactly once");
+  breakBlock(mkBlock(), null); // 501st break: unlock() must stay idempotent
+  assert.equal(G.newUnlocksThisRun.filter(id => id === 'avalanche').length, 1, "unlock() does not push duplicates once already unlocked");
+  clearMeta();
+}
+
+/* ---------- storage round-trip via the memStore fallback (sandbox has no localStorage) ---------- */
+{
+  clearMeta();
+  const fresh = loadMeta();
+  const defaultShape = JSON.stringify({ v: 1, bestTable: 0, bestTurn: 0, bestCoins: 0,
+    lifetime: { broken: 0, launches: 0, bossKills: 0 }, unlocked: {} });
+  assert.equal(JSON.stringify(fresh), defaultShape, "clearMeta resets to defaults");
+
+  checkAchievements({ table: 2 }); // unlocks 'twins', triggers a real saveMeta()
+  const afterUnlock = loadMeta();
+  assert.equal(afterUnlock.unlocked.twins, true, "saveMeta/loadMeta round-trip persists unlocked flags via memStore");
+
+  storageSet(META_KEY, '{not valid json');
+  assert.doesNotThrow(() => loadMeta(), "corrupt JSON in storage must not throw");
+  const corrupt = loadMeta();
+  assert.equal(JSON.stringify(corrupt), defaultShape, "corrupt JSON falls back to defaults");
+  clearMeta();
+}
+
+/* ---------- tableName ---------- */
+{
+  assert.equal(tableName(1), 'Penny Slots');
+  assert.equal(tableName(8), 'The House');
+  assert.equal(tableName(10), 'Overtime 2');
 }
 
 console.log("game logic tests: ok");

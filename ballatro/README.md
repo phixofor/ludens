@@ -14,6 +14,27 @@ A single-file mobile web game that mashes **Holedown**'s squishy ball-bouncing w
 - Every 4 rounds the **shop** opens — buy, sell, or reroll jokers. You hold five. After round 12, the shop also sells **Ball Packs** for permanent +1 ball (+10 chips first, +6 each after).
 - A **boss brick** drops every 12 rounds. Its armor floors weak hits at 1 damage, so you need damage jokers to punch through before it descends onto you.
 
+## Tables & Win Condition
+
+Progress through eight named casino floors, each ending with a boss encounter. Beat **The House** (Table 8) to win the run. Clear a table, bank your earnings in the cash-out ceremony, and advance to the next.
+
+| Table | Rounds | Boss |
+|---|---|---|
+| Penny Slots | 1–12 | Boss 1 |
+| Main Floor | 13–24 | Boss 2 |
+| High Limit | 25–36 | Boss 3 |
+| VIP Room | 37–48 | Boss 4 |
+| Whale Tank | 49–60 | Boss 5 |
+| The Vault | 61–72 | Boss 6 |
+| Owner's Suite | 73–84 | Boss 7 |
+| The House | 85–96 | Boss 8 |
+
+**Win condition:** Defeat the boss at the end of Table 8. You'll see a "YOU BEAT THE HOUSE" screen with your final stats. Choose to continue into **Overtime** (endless tables, numbered 9+) or start a fresh run.
+
+**Cash-out ceremony:** When you clear a table, the board pauses and a staggered overlay shows your earnings: chips broken, chips cut (from cascades), crits landed, boss bonus, and a table clear bonus (scales with table difficulty). Bank it all and advance.
+
+**Depth-meter HUD:** The top stat now shows your table name and progress (`X/12` rounds), with a gold bar filling as you advance. When a boss is alive, the bar turns red and the label reads `BOSS`, showing remaining HP.
+
 ## Jokers
 
 Five slots, 89 jokers across four rarities. Shop offers roll **55% common / 32% uncommon / 11% rare / 2% legendary** per slot. Cards marked ⚠ are double-edged.
@@ -42,6 +63,10 @@ Five slots, 89 jokers across four rarities. Shop offers roll **55% common / 32% 
 
 Default aim only shows a straight direction ray — Laser Sight is the only way to preview bounces.
 
+## Combo Counter
+
+When you destroy 3+ chips in a single turn, a pulsing gold **COMBO ×N** appears at the top of the screen, celebrating your momentum. The number rises with each additional chip destroyed that turn. Combined with turn receipts (which show chip-break and cut counts for large turns), combos reward aggressive, synergistic play.
+
 ### Bank Shot & wall bounces
 
 Bank Shot adds +1 damage per side-wall bounce (left/right walls), capped at **+3 damage per ball flight**. The ceiling no longer counts — near-vertical farming was the exploit. Each copy of Bank Shot raises the cap by 3, so two copies can add up to +6 total. Stacking is still worth building around. Toll Booth (the chip-income cousin) keeps its own separate cap, and Kite retains its first-ceiling-hit niche.
@@ -61,13 +86,40 @@ Boss fights are no longer a breather: while the boss is alive, every even round 
 
 Chip HP has gotten much tougher. From round 8–10 on, a single launch clears only ~50–70% of a fresh row — full clears become rare, and you'll triage which blocks to target while letting the rest descend.
 
+## Meta-Progression
+
+Your best moments are saved. The game tracks best table reached, longest run, best earnings, and lifetime stats (total chips broken, ball launches, boss kills). On the start screen, a persistent line shows your previous run's best: *"Best: Table N · Depth M"*.
+
+### Locked Jokers & Achievements
+
+Fourteen rare and legendary jokers are locked behind achievements, encouraging long-term play and varied strategies:
+
+| Joker | Rarity | Unlock Condition |
+|---|---|---|
+| 👯 Twins | Rare | Reach Table 2 |
+| ⛓️ Chain | Rare | Reach Table 3 |
+| 🔗 Snowball | Rare | Reach Table 4 |
+| 🏛️ Phalanx | Rare | Reach Table 5 |
+| 💼 Investor | Rare | Reach Table 6 |
+| 🪞 Hall of Mirrors | Rare | Reach Table 7 |
+| 🎯 Headhunter | Rare | Defeat your first boss |
+| 💥 Shatterpoint | Rare | Break a 5+ chip cascade in one turn |
+| ⏰ Timebomb | Rare | Launch 50 balls (lifetime) |
+| 🏔️ Avalanche | Rare | Break 500 chips (lifetime) |
+| 🃏 Wild Card (leg) | Legendary | Beat Table 8 (The House) |
+| 👻 Ghost Chip (leg) | Legendary | Defeat 3 bosses (lifetime) |
+| 💰 Jackpot (leg) | Legendary | Bank 500 chips in a single run |
+| ♻️ Ouroboros (leg) | Legendary | Break 1000 chips (lifetime) |
+
+Locked jokers don't appear in the shop until unlocked. The pool remains healthy — a core set of commons and uncommons is always available, and rares/legendaries unlock progressively as you play.
+
 ## Tech
 
 - One `index.html`. Vanilla JS + Canvas. **No dependencies, no build step, no assets.**
 - Real circle-vs-convex-polygon collision so the irregular multi-cell blocks bounce off their actual angled faces.
 - Chips render from a lazily-built, per-tier sprite cache (casino chip look: rim, edge spots, printed ring, sheen) instead of being redrawn as flat polygons every frame.
 - WebAudio for all sound (synthesized, nothing to download).
-- No `localStorage`, no network calls — fully offline. Drop it on any static host.
+- `localStorage` for meta-progression (best table, lifetime stats, unlocked joker IDs); in-memory fallback if unavailable. No network calls — fully offline except for persistence. Drop it on any static host.
 
 ## Tuning knobs
 

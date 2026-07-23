@@ -78,12 +78,22 @@
   .stats-line{font-family:var(--num);font-size:15px;opacity:.9;letter-spacing:.5px;}
   .stats-line b{color:var(--gold);}
   .shoprow{display:flex;gap:10px;align-items:center;}
+  .depthbar{width:100%;height:4px;background:rgba(255,255,255,.15);border-radius:2px;overflow:hidden;margin-top:2px;}
+  .depthbar i{display:block;height:100%;width:0%;background:var(--gold);transition:width .3s ease;}
+  .stat.depth.boss .depthbar i{background:var(--danger);}
+  .cashout-lines{display:flex;flex-direction:column;gap:6px;width:min(320px,86vw);}
+  .cline{display:flex;justify-content:space-between;font-family:var(--num);font-size:15px;opacity:0;transform:translateY(6px);animation:clineIn .4s ease forwards;}
+  .cline.total{border-top:1px dashed rgba(255,255,255,.2);padding-top:6px;margin-top:4px;font-weight:700;}
+  @keyframes clineIn{to{opacity:1;transform:none}}
+  .toast{position:absolute;top:10px;left:50%;transform:translateX(-50%) translateY(-40px);opacity:0;background:rgba(0,0,0,.75);border:1px solid var(--gold);border-radius:12px;padding:8px 16px;font-size:13px;z-index:20;pointer-events:none;transition:transform .3s ease,opacity .3s ease;}
+  .toast.show{transform:translateX(-50%) translateY(0);opacity:1;}
 </style>
 </head>
 <body>
   <div id="top">
     <div class="stat coins"><b id="coins">0</b><span>Chips</span></div>
-    <div class="stat"><b id="round">1</b><span>Round</span></div>
+    <div class="stat depth" id="depthStat"><b id="depthLine">1/12</b><span id="depthLabel">Penny Slots</span>
+      <div class="depthbar"><i id="depthBarFill"></i></div></div>
     <div class="stat"><b id="balls">4</b><span>Balls</span></div>
     <div id="spacer"></div>
     <button id="mute" aria-label="Toggle sound">&#128266;</button>
@@ -105,6 +115,7 @@
         A <b>boss</b> arrives every 12 rounds &mdash; bring damage.
       </div>
       <button class="btn" id="playBtn">Deal me in</button>
+      <div class="stats-line" id="startBestLine" style="opacity:.6"></div>
     </div>
 
     <div class="ov" id="shopOv">
@@ -124,9 +135,36 @@
     <div class="ov" id="overOv">
       <div class="title" style="font-size:min(13vw,64px)">CRUSHED</div>
       <div class="stats-line">Round <b id="finalRound">1</b> &middot; <b id="finalCoins">0</b> chips banked</div>
+      <div class="stats-line" id="finalTableLine" style="opacity:.6"></div>
       <div class="stats-line" id="bestLine" style="opacity:.6"></div>
+      <div id="newUnlocks" class="stats-line" style="opacity:.8"></div>
       <button class="btn" id="retryBtn">Run it back</button>
     </div>
+
+    <div class="ov" id="cashoutOv">
+      <div class="title" style="font-size:min(11vw,52px)">TABLE CLEARED</div>
+      <div class="stats-line" id="cashoutTableName">Penny Slots</div>
+      <div class="cashout-lines">
+        <div class="cline" style="animation-delay:0ms">Chips broken<span id="cashoutBroken">0</span></div>
+        <div class="cline" style="animation-delay:120ms">Chips cut<span id="cashoutCut">0</span></div>
+        <div class="cline" style="animation-delay:240ms">Crits landed<span id="cashoutCrits">0</span></div>
+        <div class="cline" style="animation-delay:360ms">Boss bonus<span id="cashoutBossBonus">0</span></div>
+        <div class="cline" style="animation-delay:480ms">Table clear bonus<span id="cashoutClearBonus">0</span></div>
+        <div class="cline total" style="animation-delay:600ms">Banked total<span id="cashoutTotal">0</span></div>
+      </div>
+      <button class="btn" id="cashoutBtn">Bank &amp; Continue</button>
+    </div>
+
+    <div class="ov" id="wonOv">
+      <div class="title" style="font-size:min(11vw,52px)">YOU BEAT THE HOUSE</div>
+      <div class="stats-line">Table <b id="wonFinalTable">8</b> &middot; <b id="wonFinalCoins">0</b> chips banked</div>
+      <div class="shoprow">
+        <button class="btn mini" id="continueEndlessBtn">Continue (Overtime)</button>
+        <button class="btn" id="newRunBtn">New run</button>
+      </div>
+    </div>
+
+    <div id="unlockToast" class="toast"></div>
   </div>
 
 <script>
@@ -281,6 +319,54 @@ const CARDS={
 };
 const CARD_IDS=Object.keys(CARDS);
 const RAR_COLORS={common:'#8fa8a0',uncommon:'#4fb06a',rare:'#d64550',legendary:'#f2c14e'};
+
+/* ---------- meta / storage ---------- */
+const memStore={};
+function storageGet(k){ try{ if(window.localStorage) return window.localStorage.getItem(k); }catch(e){} return Object.prototype.hasOwnProperty.call(memStore,k)?memStore[k]:null; }
+function storageSet(k,v){ try{ if(window.localStorage){ window.localStorage.setItem(k,v); return; } }catch(e){} memStore[k]=v; }
+const META_KEY='ballatro_meta_v1';
+const DEFAULT_META={v:1,bestTable:0,bestTurn:0,bestCoins:0,lifetime:{broken:0,launches:0,bossKills:0},unlocked:{}};
+function loadMeta(){
+  let parsed=null;
+  try{ const raw=storageGet(META_KEY); if(raw) parsed=JSON.parse(raw); }catch(e){}
+  const m={v:1,bestTable:0,bestTurn:0,bestCoins:0,lifetime:{broken:0,launches:0,bossKills:0},unlocked:{}};
+  if(parsed && typeof parsed==='object'){
+    m.bestTable=parsed.bestTable||0; m.bestTurn=parsed.bestTurn||0; m.bestCoins=parsed.bestCoins||0;
+    if(parsed.lifetime && typeof parsed.lifetime==='object'){
+      m.lifetime.broken=parsed.lifetime.broken||0; m.lifetime.launches=parsed.lifetime.launches||0; m.lifetime.bossKills=parsed.lifetime.bossKills||0;
+    }
+    if(parsed.unlocked && typeof parsed.unlocked==='object') m.unlocked=Object.assign({},parsed.unlocked);
+  }
+  return m;
+}
+function saveMeta(){ try{ storageSet(META_KEY,JSON.stringify(META)); }catch(e){} }
+function clearMeta(){ META={v:1,bestTable:0,bestTurn:0,bestCoins:0,lifetime:{broken:0,launches:0,bossKills:0},unlocked:{}}; saveMeta(); }
+let META=loadMeta();
+
+const LOCKED_JOKERS=['twins','chain','snowball','phalanx','investor','hallofmirrors','headhunter','shatterpoint','timebomb','avalanche','wildcard','ghostchip','jackpot','ouroboros'];
+function isUnlocked(id){ return !LOCKED_JOKERS.includes(id) || !!META.unlocked[id]; }
+const ACHIEVEMENTS=[
+  {id:'twins', check:ctx=>ctx.table>=2},
+  {id:'chain', check:ctx=>ctx.table>=3},
+  {id:'snowball', check:ctx=>ctx.table>=4},
+  {id:'phalanx', check:ctx=>ctx.table>=5},
+  {id:'investor', check:ctx=>ctx.table>=6},
+  {id:'hallofmirrors', check:ctx=>ctx.table>=7},
+  {id:'headhunter', check:ctx=>ctx.bossKill && META.lifetime.bossKills>=1},
+  {id:'shatterpoint', check:ctx=>ctx.cascadeCut>=5},
+  {id:'timebomb', check:ctx=>ctx.launches && META.lifetime.launches>=50},
+  {id:'avalanche', check:ctx=>ctx.broken && META.lifetime.broken>=500},
+  {id:'ouroboros', check:ctx=>ctx.broken && META.lifetime.broken>=1000},
+  {id:'wildcard', check:ctx=>ctx.won},
+  {id:'ghostchip', check:ctx=>ctx.bossKill && META.lifetime.bossKills>=3},
+  {id:'jackpot', check:ctx=>ctx.runCoins!=null && ctx.runCoins>=500},
+];
+function checkAchievements(ctx){ for(const a of ACHIEVEMENTS) if(!META.unlocked[a.id] && a.check(ctx)) unlock(a.id); }
+function unlock(id){ if(META.unlocked[id])return; META.unlocked[id]=true; saveMeta(); G.newUnlocksThisRun.push(id); showUnlockToast(id); }
+function showUnlockToast(id){ const el=document.getElementById('unlockToast'); if(!el)return;
+  const c=CARDS[id]; el.textContent='Unlocked: '+(c?c.nm:id); el.classList.add('show');
+  setTimeout(()=>{ if(el.classList)el.classList.remove('show'); },2500); }
+
 function rawCount(id){ return G.jokers.filter(j=>j===id).length; }
 function leftmostOtherThan(id){ for(const j of G.jokers) if(j!==id) return j; return null; }
 function leftmostOther(){ return leftmostOtherThan('twins'); }
@@ -315,21 +401,39 @@ function ballDmg(){ return 1+count('heavy')+3*count('glass')+Math.floor((G.stats
   -1*count('dud')+2*count('minimalist'); }
 function coinMult(){ let m=1+0.5*count('midas')+0.1*Math.min(6,G.jstate.inv||0)*count('investor');
   m*=Math.pow(0.75,count('laser')); m*=Math.pow(1.5,count('highroller'));
-  if(G.bossMod==='miser'&&bossAlive())m*=0.5; return m; }
+  if((G.bossMod==='miser'||G.bossMod2==='miser')&&bossAlive())m*=0.5; return m; }
 
 /* ---------- state ---------- */
 const G={ screen:'start', coins:0, turn:1, best:0, jokers:[], blocks:[], balls:[], queue:[], fireTimer:0,
   launchX:null, dir:null, aiming:false, particles:[], floats:[], coinfx:[], destroyedThisTurn:0,
   timeScale:1, firstReturnX:null, shake:0, shopVisits:0, bonusBalls:0, rerollCost:3, offers:[],
-  jstate:{}, stats:{broken:0}, bossMod:null, tollThisLaunch:0, _died:false };
+  jstate:{}, stats:{broken:0}, bossMod:null, tollThisLaunch:0, _died:false,
+  table:1, tstats:{broken:0,cut:0,crits:0}, pendingCashout:null, hasWon:false, bossMod2:null,
+  brokenThisTurn:0, cutThisTurn:0, coinsThisTurn:0,
+  newUnlocksThisRun:[], bossKillsThisRun:0, launchesThisRun:0, peakCoinsThisRun:0 };
 
 function reset(){
   Object.assign(G,{coins:0,turn:1,jokers:[],blocks:[],balls:[],queue:[],launchX:W/2,dir:null,aiming:false,
     particles:[],floats:[],coinfx:[],destroyedThisTurn:0,timeScale:1,firstReturnX:null,fireTimer:0,
-    shake:0,shopVisits:0,bonusBalls:0,rerollCost:3,offers:[],jstate:{},stats:{broken:0},bossMod:null,tollThisLaunch:0,ballIdx:0,_died:false});
-  spawnRow(); descend(); spawnRow(); descend(); spawnRow();
+    shake:0,shopVisits:0,bonusBalls:0,rerollCost:3,offers:[],jstate:{},stats:{broken:0},bossMod:null,tollThisLaunch:0,ballIdx:0,_died:false,
+    bossMod2:null,pendingCashout:null,hasWon:false,brokenThisTurn:0,cutThisTurn:0,coinsThisTurn:0,
+    newUnlocksThisRun:[],bossKillsThisRun:0,launchesThisRun:0,peakCoinsThisRun:0});
+  beginTable(1);
   renderHand(); syncTop();
 }
+function beginTable(n){
+  G.table=n; G.tstats={broken:0,cut:0,crits:0}; G.blocks=[];
+  spawnRow(); descend(); spawnRow(); descend(); spawnRow();
+  checkAchievements({table:n});
+  syncDepth();
+}
+function advanceToNextTable(){
+  beginTable(G.table+1); G.screen='play';
+  if(G.turn%4===1 && G.turn>1) openShop();
+}
+const TABLE_NAMES=['Penny Slots','Main Floor','High Limit','VIP Room','Whale Tank','The Vault',"Owner's Suite",'The House'];
+function tableName(n){ return n<=8 ? TABLE_NAMES[n-1] : 'Overtime '+(n-8); }
+function tableClearBonus(n){ return 8+4*n; }
 
 /* ---------- blocks ---------- */
 const REWARD=[1,1,2,2,3,4];
@@ -366,7 +470,9 @@ function spawnBoss(){
   const num=Math.floor(G.turn/12);
   const hp=baseHpAt(12*num)*10, armor=1+num;
   G.bossMod=BOSS_MODS[Math.floor(Math.random()*BOSS_MODS.length)];
-  const b=newBlock(0,0,hp,'chip',1,1); b.boss=true; b.rowSpan=2; b.armor=armor+(G.bossMod==='wall'?2:0); b.reward=Math.round(hp*0.2); b.maxhp=hp;
+  G.bossMod2=null;
+  if(num>=5){ do{ G.bossMod2=BOSS_MODS[Math.floor(Math.random()*BOSS_MODS.length)]; }while(G.bossMod2===G.bossMod); }
+  const b=newBlock(0,0,hp,'chip',1,1); b.boss=true; b.rowSpan=2; b.armor=armor+((G.bossMod==='wall'||G.bossMod2==='wall')?2:0); b.reward=Math.round(hp*0.2); b.maxhp=hp;
   G.blocks.push(b); sBoss(); G.shake=14; floatText(W/2,playTop+cellH,'BOSS','#e8452e');
   floatText(W/2,playTop+cellH*1.8,BOSS_MOD_NAMES[G.bossMod],'#f2c14e');
 }
@@ -390,7 +496,9 @@ function fire(){
   if(G.screen!=='play'||!G.dir||G.balls.length||G.queue.length)return;
   const hr=count('highroller'); if(hr>0){ G.coins=Math.max(0,G.coins-6*hr); syncTop(); }
   const n=ballCount(); G.queue=[]; for(let i=0;i<n;i++)G.queue.push(1);
-  G.fireTimer=0; G.firstReturnX=null; G.destroyedThisTurn=0; G.timeScale=1; G.tollThisLaunch=0; G.ballIdx=0; sLaunch();
+  G.fireTimer=0; G.firstReturnX=null; G.destroyedThisTurn=0; G.timeScale=1; G.tollThisLaunch=0; G.ballIdx=0;
+  G.brokenThisTurn=0; G.cutThisTurn=0; G.coinsThisTurn=0; sLaunch();
+  G.launchesThisRun=(G.launchesThisRun||0)+1; META.lifetime.launches++; saveMeta(); checkAchievements({launches:true});
 }
 function ballIndex(ball){ return ball.idx||0; }
 function isFirstBall(ball){ return ballIndex(ball)===0; }
@@ -402,6 +510,9 @@ function spawnBall(anchor){ let dmg=ballDmg();
   if(tb>0 && idx%5===4){ dmg+=5*tb; skipWall=true; jokerProc('timebomb'); }
   G.balls.push({x:G.launchX,y:launchY,vx:G.dir.x*SPEED,vy:G.dir.y*SPEED,r:ballR,dmg,ht:0,anchor:!!anchor,idx,_skipWall:skipWall}); }
 function endTurn(){
+  if(G.brokenThisTurn>=6 || G.cutThisTurn>=3){
+    floatText(W/2,playTop+cellH,G.brokenThisTurn+' broke · '+G.cutThisTurn+' cut · +'+G.coinsThisTurn,'#f2c14e',cellW*0.28);
+  }
   const ic=count('interest'); if(ic>0){ const g=Math.min(8,Math.floor(G.coins/8)*ic); if(g>0){addCoins(g,W-40,40,true); jokerProc('interest');} }
   const pig=count('piggy'); if(pig>0){ addCoins(2*pig,W-40,60,true); jokerProc('piggy'); }
   const ls=count('loanshark'); if(ls>0){ G.coins=Math.max(0,G.coins-2*ls); jokerProc('loanshark'); }
@@ -410,11 +521,11 @@ function endTurn(){
   const dd=count('doubledown'); if(dd>0 && G.jokers.length>=5){ addCoins(3*dd,W-40,120,true); jokerProc('doubledown'); }
   const spk=count('stockpile'); if(spk>0){ const g2=Math.min(5,Math.floor(G.coins/10))*spk; if(g2>0){addCoins(g2,W-40,140,true); jokerProc('stockpile');} }
   G.turn++; descend();
-  if(G.turn%12===0) spawnBoss();
+  if(G.turn%12===0){ if(!bossAlive()) spawnBoss(); }
   else if(!bossAlive()) spawnRow();
   else if(G.turn%2===0) spawnRow(0.5);
   checkSupport();
-  if(G.bossMod==='magnet' && bossAlive()) G.launchX=W/2;
+  if((G.bossMod==='magnet'||G.bossMod2==='magnet') && bossAlive()) G.launchX=W/2;
   syncTop();
   if(G.turn%4===1 && G.turn>1) openShop();
 }
@@ -426,18 +537,19 @@ function checkLoss(){
 }
 
 /* ---------- fx ---------- */
-function addCoins(a,x,y,silent){ if(a<=0)return; G.coins+=a;
+function addCoins(a,x,y,silent){ if(a<=0)return; G.coins+=a; G.coinsThisTurn=(G.coinsThisTurn||0)+a;
   for(let i=0;i<Math.min(a,6);i++)G.coinfx.push({x:x+(Math.random()-.5)*20,y:y+(Math.random()-.5)*20,life:1});
-  if(!silent)sCoin(); syncTop(); }
+  if(!silent)sCoin(); syncTop();
+  if(G.coins>(G.peakCoinsThisRun||0)){ G.peakCoinsThisRun=G.coins; checkAchievements({runCoins:G.peakCoinsThisRun}); } }
 function burst(x,y,c,n){ for(let i=0;i<n;i++){ const a=Math.random()*6.28,sp=40+Math.random()*160;
   G.particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-40,life:1,r:2+Math.random()*3,c,kind:'circle'}); } }
 function shardBurst(x,y,face,spot,n){ for(let i=0;i<n;i++){ const a=Math.random()*6.28,sp=50+Math.random()*180;
   G.particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-60,life:1,w:3+Math.random()*4,h:3+Math.random()*4,
     rot:Math.random()*6.28,spin:(Math.random()-.5)*10,c:Math.random()<0.6?face:spot,kind:'shard'}); } }
 function ringBurst(x,y,c){ G.particles.push({x,y,life:1,rad:cellW*0.08,maxr:cellW*1.5,c,kind:'ring'}); }
-function floatText(x,y,t,c){ G.floats.push({x,y,txt:t,life:1,c:c||'#fff'}); }
+function floatText(x,y,t,c,size){ G.floats.push({x,y,txt:t,life:1,c:c||'#fff',size:size||null}); }
 let lastCritFx=0;
-function critFlash(x,y){ const now=performance.now(); if(now-lastCritFx<200)return; lastCritFx=now; floatText(x,y,'CRIT','#f2c14e'); }
+function critFlash(x,y){ const now=performance.now(); if(now-lastCritFx<200)return; lastCritFx=now; floatText(x,y,'CRIT','#f2c14e',cellW*0.5); }
 
 function chainReaction(origin,copies){
   const queue=[origin];
@@ -470,9 +582,10 @@ function checkSupport(){
       if(touch){ anchored.add(ob); queue.push(ob); }
     }
   }
-  let any=false;
-  for(const b of chips) if(!anchored.has(b)){ detachChip(b); any=true; }
+  let any=false, cutCount=0;
+  for(const b of chips) if(!anchored.has(b)){ detachChip(b); any=true; cutCount++; }
   if(any) sFall();
+  if(cutCount>=5) checkAchievements({cascadeCut:cutCount});
   return any;
 }
 function detachChip(b){
@@ -486,6 +599,8 @@ function detachChip(b){
   if(count('blastcap')>0){ splashHit(b,2*count('blastcap')); jokerProc('blastcap'); }
   G.destroyedThisTurn++;
   G.stats.broken=(G.stats.broken||0)+1;
+  G.tstats.cut=(G.tstats.cut||0)+1; G.cutThisTurn=(G.cutThisTurn||0)+1;
+  META.lifetime.broken++; saveMeta(); checkAchievements({broken:true});
   G.particles.push({kind:'faller',x:bx(b),y:by(b),vy:40+Math.random()*20,vr:(Math.random()-.5)*6,
     rot:b.rot,sKind:b.kind,cw:b.cw,chh:b.chh,hp:b.hp,life:1});
 }
@@ -523,10 +638,13 @@ function breakBlock(b,ball){
   if(count('hallofmirrors')>0){ const other=rightmostOther('hallofmirrors'); const rb=replayBonus(other,b,ball); if(rb){ c+=rb; jokerProc('hallofmirrors'); } }
   G.destroyedThisTurn++;
   G.stats.broken=(G.stats.broken||0)+1;
+  if(!b.boss){ G.tstats.broken=(G.tstats.broken||0)+1; G.brokenThisTurn=(G.brokenThisTurn||0)+1;
+    META.lifetime.broken++; saveMeta(); checkAchievements({broken:true}); }
   const px=b.boss?W/2:bx(b), py=b.boss?bossGeom(b).cy:by(b);
   addCoins(c,px,py); floatText(px,py-cellH*0.3,'+'+c,'#f2c14e');
   G.shake=Math.min(14,G.shake+2+G.destroyedThisTurn*0.3);
-  if(b.boss){ for(let i=0;i<2;i++){ const bb=newBlock(1+i*4,b.row,0,'ball',1,1); bb.dispRow=b.dispRow; G.blocks.push(bb);} G.bossMod=null; }
+  if(b.boss){ for(let i=0;i<2;i++){ const bb=newBlock(1+i*4,b.row,0,'ball',1,1); bb.dispRow=b.dispRow; G.blocks.push(bb);} G.bossMod=null; G.bossMod2=null; G.pendingCashout={bossBonus:c};
+    G.bossKillsThisRun=(G.bossKillsThisRun||0)+1; META.lifetime.bossKills++; saveMeta(); checkAchievements({bossKill:true}); }
   else if(count('chain')>0){ jokerProc('chain'); chainReaction(b,count('chain')); }
 }
 
@@ -583,7 +701,7 @@ function hitBlock(ball,b){
   if(count('hardhat')>0){ dmg=Math.max(0,dmg-1*count('hardhat')); jokerProc('hardhat'); }
   const bruise=count('bruiser')>0 && tierIndexForHp(b.maxhp||b.reward)===0;
   const cc=critChance(), crit=cc>0 && Math.random()<cc;
-  if(crit){ dmg*=2; critFlash(cx0,cy0); jokerProc('headhunter'); }
+  if(crit){ dmg*=2; critFlash(cx0,cy0); jokerProc('headhunter'); G.tstats.crits=(G.tstats.crits||0)+1; }
   else if(count('warhead')>0){ dmg=Math.max(1,dmg-1*count('warhead')); jokerProc('warhead'); }
   b._hpBefore=b.hp; b._hitDamage=dmg; b.hp-=dmg; b.squash=1; b.flash=1; sHit(G.destroyedThisTurn);
   if(crit && count('headhunter')>0 && b.hp>0 && b.hp<=3) b.hp=0;
@@ -635,7 +753,9 @@ function update(dt){
     const before=G.balls.length; G.balls=G.balls.filter(b=>!b._collected);
     if(before>0 && G.balls.length===0 && G.queue.length===0){
       if(G.firstReturnX!=null)G.launchX=Math.max(launchR,Math.min(W-launchR,G.firstReturnX));
-      G.timeScale=1; endTurn(); if(G.screen==='play')checkLoss();
+      G.timeScale=1;
+      if(G.pendingCashout){ if(!checkLoss()){ enterCashout(); } else { G.pendingCashout=null; } }
+      else { endTurn(); if(G.screen==='play')checkLoss(); }
     }
   }
   for(const p of G.particles){
@@ -784,6 +904,7 @@ function buildBossSprite(hw,hh){
   return {canvas:cnv,w,h};
 }
 function draw(){
+  syncDepth();
   ctx.clearRect(0,0,W,H);
   if(!feltBg) feltBg=buildFeltBg();
   ctx.drawImage(feltBg,0,0,W,H);
@@ -823,10 +944,17 @@ function draw(){
     ctx.fillStyle=p.c; ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,7); ctx.fill();
   }
   ctx.globalAlpha=1; ctx.textAlign='center';
-  for(const f of G.floats){ ctx.globalAlpha=Math.max(0,f.life); ctx.fillStyle=f.c; ctx.font='700 '+Math.round(cellW*0.34)+'px "Space Grotesk",monospace'; ctx.fillText(f.txt,f.x,f.y); }
+  for(const f of G.floats){ ctx.globalAlpha=Math.max(0,f.life); ctx.fillStyle=f.c; ctx.font='700 '+Math.round(f.size||cellW*0.34)+'px "Space Grotesk",monospace'; ctx.fillText(f.txt,f.x,f.y); }
   ctx.globalAlpha=1;
   for(const c of G.coinfx){ ctx.globalAlpha=Math.max(0,c.life); ctx.fillStyle='#f2c14e'; ctx.beginPath(); ctx.arc(c.x,c.y,3.5,0,7); ctx.fill(); }
   ctx.globalAlpha=1; ctx.restore();
+  if(G.screen==='play' && G.balls.length && G.destroyedThisTurn>=3){
+    const now=performance.now(), size=cellW*0.5*(1+0.08*Math.sin(now/90));
+    ctx.save(); ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillStyle='#f2c14e';
+    ctx.font='700 '+Math.round(size)+'px "Space Grotesk",monospace';
+    ctx.fillText('COMBO ×'+G.destroyedThisTurn,W/2,playTop+cellH*0.6);
+    ctx.restore();
+  }
   if(G.balls.length && G.screen==='play'){ ctx.textAlign='center'; ctx.globalAlpha=.5; ctx.fillStyle='#f3ead2'; ctx.font='600 12px "Fredoka",sans-serif';
     ctx.fillText(G.timeScale>1?'\u25B6\u25B6 FAST':'tap to speed up',W/2,H-8); ctx.globalAlpha=1; }
 }
@@ -874,7 +1002,7 @@ function drawLauncher(){
   ctx.restore();
 }
 function drawAim(){
-  if(G.bossMod==='fog' && bossAlive())return;
+  if((G.bossMod==='fog'||G.bossMod2==='fog') && bossAlive())return;
   const laser=count('laser')>0, step=cellW*0.5;
   let x=G.launchX,y=launchY,vx=G.dir.x,vy=G.dir.y;
   ctx.fillStyle=laser?'rgba(232,69,46,.75)':'rgba(243,234,210,.55)';
@@ -928,7 +1056,20 @@ function jokerProc(id){ const now=performance.now();
 }
 function punchCoins(){ const el=document.getElementById('coins'), wrap=el&&el.parentElement; if(!wrap||!wrap.classList)return;
   wrap.classList.add('punch'); setTimeout(()=>wrap.classList.remove('punch'),320); }
-function syncTop(){ document.getElementById('coins').textContent=G.coins; document.getElementById('round').textContent=G.turn; document.getElementById('balls').textContent=ballCount(); }
+function syncTop(){ document.getElementById('coins').textContent=G.coins; document.getElementById('balls').textContent=ballCount(); }
+function syncDepth(){
+  const line=document.getElementById('depthLine'), label=document.getElementById('depthLabel'),
+    fill=document.getElementById('depthBarFill'), stat=document.getElementById('depthStat');
+  label.textContent=tableName(G.table);
+  const boss=G.blocks.find(b=>b.boss&&!b.dead);
+  if(boss){
+    line.textContent='BOSS'; fill.style.width=Math.max(0,Math.min(100,100*boss.hp/boss.maxhp))+'%';
+    if(stat.classList)stat.classList.add('boss');
+  }else{
+    const within=((G.turn-1)%12)+1; line.textContent=within+'/12'; fill.style.width=(within/12*100)+'%';
+    if(stat.classList)stat.classList.remove('boss');
+  }
+}
 
 const shopOv=document.getElementById('shopOv');
 const PRICE={common:4,uncommon:6,rare:9,legendary:25};
@@ -944,7 +1085,13 @@ function rerollPrice(){ const base=Math.max(1, G.rerollCost-2*count('recycler')-
 function pickRarity(forceMin){ const r=Math.random();
   let rar=r<0.55?'common':r<0.87?'uncommon':r<0.98?'rare':'legendary';
   if(forceMin && rar==='common') rar='uncommon'; return rar; }
-function pickOffer(forceMin){ const pool=RARITY_IDS[pickRarity(forceMin)]; return pool[Math.floor(Math.random()*pool.length)]; }
+function pickOffer(forceMin){
+  const order=['legendary','rare','uncommon','common'];
+  let idx=order.indexOf(pickRarity(forceMin));
+  let pool=RARITY_IDS[order[idx]].filter(isUnlocked);
+  while(!pool.length && idx<order.length-1){ idx++; pool=RARITY_IDS[order[idx]].filter(isUnlocked); }
+  return pool[Math.floor(Math.random()*pool.length)];
+}
 function buildOffers(){ G.offers=[];
   const hs=count('highstakes')>0, n=3+(count('vault')>0?1:0);
   for(let i=0;i<n;i++){ let id=pickOffer(hs&&i===0); if(G.offers.includes(id))id=pickOffer(hs&&i===0); G.offers.push(id); }
@@ -998,14 +1145,75 @@ document.getElementById('rerollBtn').onclick=()=>{ const p=rerollPrice(); if(G.c
   jokerProc('recycler'); buildOffers(); };
 document.getElementById('nextBtn').onclick=()=>{ shopOv.classList.remove('show'); G.screen='play'; checkLoss(); };
 
+function computeCashoutTally(){
+  return { broken:G.tstats.broken, cut:G.tstats.cut, crits:G.tstats.crits,
+    bossBonus:(G.pendingCashout && G.pendingCashout.bossBonus)||0, clearBonus:tableClearBonus(G.table) };
+}
+function tweenNumber(el,target,frames){
+  frames=frames||40; let f=0;
+  (function step(){
+    f++; const p=Math.min(1,f/frames);
+    el.textContent=Math.round(target*p);
+    if(p<1){ if(f%6===0)sCoin(); requestAnimationFrame(step); }
+    else el.textContent=target;
+  })();
+}
+function showCashout(tally){
+  document.getElementById('cashoutTableName').textContent=tableName(G.table);
+  tweenNumber(document.getElementById('cashoutBroken'),tally.broken);
+  tweenNumber(document.getElementById('cashoutCut'),tally.cut);
+  tweenNumber(document.getElementById('cashoutCrits'),tally.crits);
+  tweenNumber(document.getElementById('cashoutBossBonus'),tally.bossBonus);
+  tweenNumber(document.getElementById('cashoutClearBonus'),tally.clearBonus);
+  tweenNumber(document.getElementById('cashoutTotal'),G.coins);
+  document.getElementById('cashoutOv').classList.add('show');
+}
+function enterCashout(){
+  const tally=computeCashoutTally();
+  G.pendingCashout=null;
+  G.turn++; syncTop();
+  addCoins(tally.clearBonus,W/2,H/2,true);
+  G.screen='cashout'; showCashout(tally);
+}
+function enterWon(){
+  G.hasWon=true; G.screen='won';
+  checkAchievements({won:true});
+  document.getElementById('wonFinalTable').textContent=G.table;
+  document.getElementById('wonFinalCoins').textContent=G.coins;
+  document.getElementById('wonOv').classList.add('show');
+}
+document.getElementById('cashoutBtn').onclick=()=>{
+  document.getElementById('cashoutOv').classList.remove('show');
+  if(!G.hasWon && G.table>=8) enterWon(); else advanceToNextTable();
+};
+document.getElementById('continueEndlessBtn').onclick=()=>{
+  document.getElementById('wonOv').classList.remove('show'); advanceToNextTable();
+};
+document.getElementById('newRunBtn').onclick=()=>{
+  document.getElementById('wonOv').classList.remove('show'); G.screen='play'; reset();
+};
+
 function gameOver(){ G.screen='over'; sOver(); G.best=Math.max(G.best,G.coins);
+  META.bestTable=Math.max(META.bestTable,G.table); META.bestTurn=Math.max(META.bestTurn,G.turn);
+  META.bestCoins=Math.max(META.bestCoins,G.coins); saveMeta();
   document.getElementById('finalRound').textContent=G.turn; document.getElementById('finalCoins').textContent=G.coins;
-  document.getElementById('bestLine').textContent='Best this session: '+G.best+' chips'; document.getElementById('overOv').classList.add('show'); }
+  document.getElementById('finalTableLine').textContent='Table '+G.table+' · '+tableName(G.table);
+  document.getElementById('bestLine').textContent='Best: Table '+META.bestTable+' · Depth '+META.bestTurn+' · '+META.bestCoins+' chips';
+  const nu=document.getElementById('newUnlocks'); nu.innerHTML='';
+  for(const id of G.newUnlocksThisRun){ const c=CARDS[id]; const row=document.createElement('div');
+    row.textContent='Unlocked: '+(c?c.nm:id); nu.appendChild(row); }
+  document.getElementById('overOv').classList.add('show'); }
+
+function renderStartMeta(){
+  const el=document.getElementById('startBestLine');
+  if(META.bestTable>0) el.textContent='Best: Table '+META.bestTable+' · Depth '+META.bestTurn;
+}
 
 document.getElementById('playBtn').onclick=()=>{ initAudio(); document.getElementById('startOv').classList.remove('show'); G.screen='play'; reset(); };
 document.getElementById('retryBtn').onclick=()=>{ document.getElementById('overOv').classList.remove('show'); G.screen='play'; reset(); };
 document.getElementById('mute').onclick=()=>{ muted=!muted; document.getElementById('mute').textContent=muted?'\uD83D\uDD08':'\uD83D\uDD0A'; };
 
+renderStartMeta();
 resize(); renderHand(); requestAnimationFrame(loop);
 })();
 </script>

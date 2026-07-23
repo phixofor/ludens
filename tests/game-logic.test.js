@@ -14,11 +14,14 @@ const scriptMatch = rootHtml.match(/<script>([\s\S]*?)<\/script>/);
 assert.ok(scriptMatch, "game script is present");
 
 function element() {
+  const classes = new Set();
   const el = {
     children: [],
-    classList: { add() {}, remove() {}, toggle() {} },
+    _listeners: {},
+    classList: { add(...xs) { xs.forEach(x=>classes.add(x)); }, remove(...xs) { xs.forEach(x=>classes.delete(x)); }, toggle(x,on) { if(on===undefined? !classes.has(x):on)classes.add(x);else classes.delete(x); }, contains(x){ return classes.has(x); } },
     style: { setProperty() {} },
-    addEventListener() {},
+    addEventListener(type,fn) { (this._listeners[type]||(this._listeners[type]=[])).push(fn); },
+    dispatchEvent(event) { for(const fn of this._listeners[event.type]||[])fn(event); },
     appendChild(child) { this.children.push(child); },
     textContent: "",
     disabled: false,
@@ -52,13 +55,14 @@ const sandbox = {
   performance: { now: () => 0 },
   requestAnimationFrame() {},
   setTimeout,
+  clearTimeout,
   Math,
 };
 sandbox.globalThis = sandbox;
 
 const instrumented = scriptMatch[1].replace(
   "resize(); renderHand(); requestAnimationFrame(loop);",
-  "globalThis.__game={G,bossAlive,breakBlock,sellValue,refreshShop,renderShop,reset,CARDS,count,ballCount,ballDmg,coinMult,wallHit,spawnRow,spawnBoss,endTurn,hitBlock,cardPrice,buildOffers,bossGeom,checkSupport,checkLoss,critChance,pierceChance,baseHpAt,newBlock,ballPackPrice,rerollPrice,openShop,update,fire,resize,bx,by,tableClearBonus,beginTable,enterCashout,computeCashoutTally,loadMeta,saveMeta,clearMeta,isUnlocked,checkAchievements,LOCKED_JOKERS,tableName,pickOffer,storageGet,storageSet,META_KEY,advanceToNextTable};"
+  "globalThis.__game={G,bossAlive,breakBlock,detachChip,sellValue,refreshShop,renderShop,reset,CARDS,count,ballCount,ballDmg,coinMult,wallHit,spawnRow,spawnBoss,endTurn,hitBlock,cardPrice,buildOffers,bossGeom,checkSupport,checkLoss,critChance,pierceChance,baseHpAt,newBlock,ballPackPrice,rerollPrice,openShop,update,fire,resize,bx,by,tableClearBonus,tableQuotaFor,beginTable,enterCashout,computeCashoutTally,loadMeta,saveMeta,clearMeta,isUnlocked,checkAchievements,LOCKED_JOKERS,tableName,pickOffer,storageGet,storageSet,META_KEY,LEGACY_META_KEY,advanceToNextTable,effectiveDifficultyRound,analyzeSupport,cachedSupportAnalysis,completeVolley,spawnBall,geometrySnapshot,aimWithinBoard,startVolley,settleVolley,finishReceipt,skipReceipt,generateGoals,evaluateGoals};"
 );
 assert.notEqual(instrumented, scriptMatch[1], "game script test hook was installed");
 vm.runInNewContext(instrumented, sandbox);
@@ -69,7 +73,9 @@ const {
   spawnRow, spawnBoss, endTurn, hitBlock, cardPrice, buildOffers, bossGeom, checkSupport, checkLoss,
   critChance, pierceChance, baseHpAt, newBlock, ballPackPrice, rerollPrice, openShop, update, fire, resize, bx, by,
   tableClearBonus, beginTable, enterCashout, computeCashoutTally, loadMeta, saveMeta, clearMeta,
-  isUnlocked, checkAchievements, LOCKED_JOKERS, tableName, pickOffer, storageGet, storageSet, META_KEY, advanceToNextTable,
+  isUnlocked, checkAchievements, LOCKED_JOKERS, tableName, pickOffer, storageGet, storageSet, META_KEY, LEGACY_META_KEY, advanceToNextTable,
+  effectiveDifficultyRound, analyzeSupport, cachedSupportAnalysis, completeVolley, spawnBall, geometrySnapshot, aimWithinBoard,
+  tableQuotaFor, startVolley, settleVolley, finishReceipt, skipReceipt, generateGoals, evaluateGoals, detachChip,
 } = sandbox.__game;
 
 resize();
@@ -108,14 +114,14 @@ assert.equal(bossAlive(), true, "a living boss still suppresses normal rows");
 
 Object.assign(G, { coins: 0, jokers: ["overkill"], particles: [], coinfx: [], floats: [], destroyedThisTurn: 0 });
 breakBlock({ boss: false, col: 0, cw: 1, chh: 1, dispRow: 0, hp: 0, reward: 1, _hitDamage: 1, _hpBefore: 1 }, {});
-assert.equal(G.coins, 1, "armor-reduced damage must not create fake overkill chips");
+assert.equal(G.coins, 1, "armor-reduced damage must not create fake overkill Cash");
 Object.assign(G, { coins: 0, particles: [], coinfx: [], floats: [], destroyedThisTurn: 0 });
 breakBlock({ boss: false, col: 0, cw: 1, chh: 1, dispRow: 0, hp: 0, reward: 1, _hitDamage: 5, _hpBefore: 1 }, {});
-assert.equal(G.coins, 5, "real excess damage still awards overkill chips");
+assert.equal(G.coins, 5, "real excess damage still awards Overkill Cash");
 
 Object.assign(G, { coins: 0, jokers: ["heavy", "rapid", "midas", "interest", "combo"], shopVisits: 1, rerollCost: 3, offers: [] });
 refreshShop();
-const displayedSellValue = Number(getElement("ownedRow").children[0].innerHTML.match(/\+(\d+)/)[1]);
+const displayedSellValue = Number(getElement("ownedRow").children[0].innerHTML.match(/\+\$(\d+)/)[1]);
 getElement("ownedRow").children[0].onclick();
 assert.equal(G.coins, displayedSellValue, "selling a joker must pay the displayed value");
 
@@ -150,7 +156,7 @@ assert.equal(G.offers.length, 0);
     col: 0, cw: 1, chh: 1, kind: "square" };
   breakBlock(block, null);
   breakBlock(block, null);
-  assert.equal(G.coins, 1, "the same destroyed chip can only pay once");
+  assert.equal(G.coins, 1, "the same destroyed chip can only pay Cash once");
   assert.equal(G.stats.broken, 1, "the same destroyed chip can only increment stats once");
 }
 {
@@ -161,7 +167,7 @@ assert.equal(G.offers.length, 0);
       { col: 2, row: 2, cw: 1, chh: 1, type: "chip", boss: false, dead: false, hp: 1, maxhp: 1, reward: 1, rot: 0, kind: "square", dispRow: 2 },
     ] });
   checkSupport();
-  assert.equal(G.coins, 2, "a splash-killed chip in a falling cluster must not also receive a detach payout");
+  assert.equal(G.coins, 2, "a splash-killed chip in a falling cluster cannot pay Cash twice");
   assert.equal(G.stats.broken, 2, "a splash-killed falling chip is counted exactly once");
 }
 
@@ -218,9 +224,9 @@ for (const id of cardIds) assert.ok(validRar.has(CARDS[id].rar), `${id} has a va
 
 /* ---------- spawnRow HP band at turn 36 ---------- */
 {
-  Object.assign(G, { turn: 36, blocks: [] });
+  Object.assign(G, { table: 3, bossOvertime: true, blocks: [] });
   withRandomSeq(noGapPattern(7), () => spawnRow());
-  assert.equal(G.blocks.length, 7, "no gaps/pickups/wide chips rolled -> one chip per column");
+  assert.equal(G.blocks.length, 7, "the seven-column board creates one chip per column");
   for (const b of G.blocks) {
     assert.equal(b.type, "chip");
     assert.equal(b.cw, 1);
@@ -230,48 +236,51 @@ for (const id of cardIds) assert.ok(validRar.has(CARDS[id].rar), `${id} has a va
 
 /* ---------- spawnRow gap floor respected ---------- */
 {
-  Object.assign(G, { turn: 100, blocks: [] });
+  Object.assign(G, { table: 9, bossOvertime: true, blocks: [] });
   withRandomSeq([0.049, ...noGapPattern(6)], () => spawnRow());
   assert.equal(G.blocks[0].col, 1, "gap floor of 0.05 still lets a sub-floor roll skip column 0");
 }
 
-/* ---------- spawnBoss at turn 24 ---------- */
+/* ---------- spawnBoss at table 2 ---------- */
 {
-  Object.assign(G, { turn: 24, blocks: [] });
+  Object.assign(G, { table: 2, bossOvertime: true, blocks: [] });
   withRandomSeq([0.3], () => spawnBoss());
   const boss = G.blocks.find(b => b.boss);
-  assert.equal(boss.hp, 250, "boss 2 hp = baseHpAt(24)*10 = 25*10");
-  assert.equal(G.bossMod, "miser", "roll 0.3 -> BOSS_MODS[1]");
-  assert.equal(boss.armor, 3, "non-wall modifier: armor = 1+num, no +2");
+  assert.equal(boss.hp, 175, "boss 2 hp = baseHpAt(24)*7 = 25*7");
+  assert.equal(G.bossMod, "scissors", "boss rules follow the visible four-table cycle");
+  assert.equal(boss.armor, 2, "armor = 1+ceil(table/2)");
 }
 
 /* ---------- boss pressure rows during boss fights ---------- */
 {
-  Object.assign(G, { turn: 21, jokers: [], coins: 0, shopVisits: 0, floats: [], coinfx: [],
+  Object.assign(G, { table: 2, roundInTable: 6, bossOvertime: true, jokers: [], coins: 0, shopVisits: 0, floats: [], coinfx: [],
     blocks: [{ boss: true, dead: false, row: 0, rowSpan: 2, hp: 50, armor: 1, dispRow: 0 }] });
   const before = G.blocks.length;
   withRandomSeq(noGapPattern(7), () => endTurn());
-  assert.equal(G.turn, 22);
-  assert.ok(G.blocks.length > before, "even turn during a boss fight adds a pressure row");
+  assert.equal(G.blocks.length, before, "the first failed boss volley has no pressure row");
+  withRandomSeq(noGapPattern(7), () => endTurn());
+  assert.ok(G.blocks.length > before, "every second failed boss volley adds a pressure row");
 }
 {
-  Object.assign(G, { turn: 22, jokers: [], coins: 0, shopVisits: 0, floats: [], coinfx: [],
+  Object.assign(G, { table: 2, roundInTable: 6, bossOvertime: true, jokers: [], coins: 0, shopVisits: 0, floats: [], coinfx: [],
     blocks: [{ boss: true, dead: false, row: 0, rowSpan: 2, hp: 50, armor: 1, dispRow: 0 }] });
   const before = G.blocks.length;
-  endTurn();
-  assert.equal(G.turn, 23);
-  assert.equal(G.blocks.length, before, "odd turn during a boss fight adds no blocks");
+  endTurn(); endTurn();
+  assert.ok(G.totalVolleys > 0, "boss overtime still records completed volleys");
+  assert.ok(G.blocks.length > before, "boss overtime pressure arrives on its second failed volley");
 }
 
 /* ---------- Skeleton Key reduces effective boss armor ---------- */
 {
   Object.assign(G, { destroyedThisTurn: 0, floats: [], coinfx: [], particles: [] });
+  startVolley();
   const b1 = { boss: true, dead: false, hp: 100, maxhp: 100, armor: 5, row: 0, rowSpan: 2, dispRow: 0 };
   const g1 = bossGeom(b1);
   const ball1 = { x: g1.cx, y: g1.cy, vx: 1, vy: 1, r: 5, dmg: 10 };
   Object.assign(G, { jokers: [] });
   hitBlock(ball1, b1);
   assert.equal(b1.hp, 95, "no skeleton key: eff dmg = max(1, 10-5) = 5");
+  assert.equal(G.volley.bossDamageScore,5,'boss Score uses actual HP removed after armor');
 
   const b2 = { boss: true, dead: false, hp: 100, maxhp: 100, armor: 5, row: 0, rowSpan: 2, dispRow: 0 };
   const g2 = bossGeom(b2);
@@ -298,12 +307,12 @@ for (const id of cardIds) assert.ok(validRar.has(CARDS[id].rar), `${id} has a va
 
 /* ---------- Snowball scaling ---------- */
 {
-  Object.assign(G, { jokers: ["snowball"], stats: { broken: 29 } });
-  assert.equal(ballDmg(), 1, "29 broken: below the 30-chip threshold, no bonus yet");
-  Object.assign(G, { stats: { broken: 30 } });
-  assert.equal(ballDmg(), 2, "30 broken: +1 ball dmg kicks in");
-  Object.assign(G, { stats: { broken: 90 } });
-  assert.equal(ballDmg(), 4, "90 broken: +3 ball dmg (3 thresholds crossed)");
+  Object.assign(G, { jokers: ["snowball"], stats: { broken: 19 } });
+  assert.equal(ballDmg(), 1, "19 broken: below the 20-chip threshold, no bonus yet");
+  Object.assign(G, { stats: { broken: 20 } });
+  assert.equal(ballDmg(), 2, "20 broken: +1 ball dmg kicks in");
+  Object.assign(G, { stats: { broken: 80 } });
+  assert.equal(ballDmg(), 5, "80 broken: +4 ball dmg (four thresholds crossed)");
 }
 
 /* ---------- sanity checks on the rest of the exported surface ---------- */
@@ -326,7 +335,7 @@ for (const id of cardIds) assert.ok(validRar.has(CARDS[id].rar), `${id} has a va
   assert.equal(detached, true, "an isolated chip with no anchor chain detaches");
   assert.equal(G.blocks[0].dead, false, "row-0 anchor chip stays");
   assert.equal(G.blocks[1].dead, true, "unsupported chip is marked dead");
-  assert.equal(G.coins, 2, "detached chip pays its tier reward");
+  assert.equal(G.coins, 2, "detached chips retain their normal Cash payout");
   assert.equal(G.particles.length, 1, "a faller particle is spawned");
   assert.equal(G.particles[0].kind, "faller");
 }
@@ -370,16 +379,16 @@ for (const id of cardIds) assert.ok(validRar.has(CARDS[id].rar), `${id} has a va
   }
 }
 
-/* ---------- boss hp = baseHpAt(12*num)*10 across multiple boss numbers ---------- */
+/* ---------- boss hp = baseHpAt(12*num)*7 across multiple tables ---------- */
 {
-  Object.assign(G, { turn: 12, blocks: [] });
+  Object.assign(G, { table: 1, bossOvertime: true, blocks: [] });
   withRandomSeq([0.1], () => spawnBoss());
-  assert.equal(G.blocks.find(b => b.boss).hp, 110, "boss 1 hp = baseHpAt(12)*10");
+  assert.equal(G.blocks.find(b => b.boss).hp, 77, "boss 1 hp = baseHpAt(12)*7");
 }
 {
-  Object.assign(G, { turn: 48, blocks: [] });
+  Object.assign(G, { table: 4, bossOvertime: true, blocks: [] });
   withRandomSeq([0.1], () => spawnBoss());
-  assert.equal(G.blocks.find(b => b.boss).hp, 600, "boss 4 hp = baseHpAt(48)*10");
+  assert.equal(G.blocks.find(b => b.boss).hp, 420, "boss 4 hp = baseHpAt(48)*7");
 }
 
 /* ---------- Bank Shot: ceiling hits never trigger the bonus ---------- */
@@ -388,6 +397,12 @@ for (const id of cardIds) assert.ok(validRar.has(CARDS[id].rar), `${id} has a va
   const ball = { dmg: 1, _bank: 0, x: 0, y: 0 };
   for (let i = 0; i < 10; i++) wallHit(ball, true);
   assert.equal(ball.dmg, 1, "10 ceiling-only hits add 0 bank-shot damage");
+}
+{
+  startVolley(); Object.assign(G,{jokers:[]});
+  const ball={dmg:1,_skipWall:true,x:0,y:0}; wallHit(ball,false);
+  assert.equal(ball._sideBounces,1,'raw side bounces are tracked even when wall bonuses are skipped');
+  assert.equal(G.volley.sideBounces,1,'the volley event ledger records raw side bounces');
 }
 
 /* ---------- Toll Booth caps at 4 per launch regardless of copies ---------- */
@@ -465,13 +480,13 @@ for (const id of cardIds) assert.ok(validRar.has(CARDS[id].rar), `${id} has a va
   Object.assign(G, { turn: 5, coins: 40, jokers: ["interest"], shopVisits: 0, floats: [], coinfx: [],
     blocks: [], jstate: {}, stats: { broken: 0 }, bossMod: null });
   endTurn();
-  assert.equal(G.coins, 45, "interest divisor 8: floor(40/8)=5 gained");
+  assert.equal(G.coins, 50, "interest payout is doubled for the six-volley cadence");
 }
 {
   Object.assign(G, { turn: 5, coins: 100, jokers: ["interest"], shopVisits: 0, floats: [], coinfx: [],
     blocks: [], jstate: {}, stats: { broken: 0 }, bossMod: null });
   endTurn();
-  assert.equal(G.coins, 108, "interest still caps at +8 even with 64+ held");
+  assert.equal(G.coins, 116, "interest cap is doubled for the six-volley cadence");
 }
 
 /* ---------- High Roller: x1.5 chips, pay 6 to launch ---------- */
@@ -503,7 +518,7 @@ for (const id of cardIds) assert.ok(validRar.has(CARDS[id].rar), `${id} has a va
   assert.equal(survivors.length, 0, "cutting the connector drops the whole 3-chip cluster in one update() pass");
   assert.equal(G.destroyedThisTurn, 3, "3 chips detached");
   assert.equal(G.stats.broken, 3);
-  assert.equal(G.coins, 6, "3 chips x reward 2 = 6 chips paid");
+  assert.equal(G.coins, 6, "cascade removals retain their normal Cash payouts");
   assert.equal(G.particles.filter(p => p.kind === "faller").length, 3, "3 faller particles spawned");
 }
 
@@ -598,28 +613,58 @@ for (const id of cardIds) assert.ok(validRar.has(CARDS[id].rar), `${id} has a va
 
 /* ---------- double-boss guard: a surviving boss never gets a second boss stacked ---------- */
 {
-  Object.assign(G, { turn: 23, jokers: [], coins: 0, shopVisits: 0, floats: [], coinfx: [],
+  Object.assign(G, { table: 2, roundInTable: 6, bossOvertime: true, jokers: [], coins: 0, shopVisits: 0, floats: [], coinfx: [],
     blocks: [{ boss: true, dead: false, row: 0, rowSpan: 2, hp: 50, armor: 1, dispRow: 0 }] });
   endTurn();
-  assert.equal(G.turn, 24, "endTurn advances the turn counter");
+  assert.ok(G.totalVolleys > 0, "endTurn records the completed volley");
   const bosses = G.blocks.filter(b => b.boss);
   assert.equal(bosses.length, 1, "a surviving boss at the turn-24 boundary must not spawn a second boss");
 }
 
-/* ---------- two boss mods at num>=5, none below the threshold ---------- */
+/* ---------- boss rules cycle predictably and never stack hidden modifiers ---------- */
 {
-  Object.assign(G, { turn: 60, blocks: [] });
+  Object.assign(G, { table: 5, bossOvertime: true, blocks: [] });
   withRandomSeq([0.3, 0.1], () => spawnBoss());
-  assert.ok(G.bossMod2, "boss number 5 (turn 60) rolls a second mod");
-  assert.notEqual(G.bossMod2, G.bossMod, "the two boss mods are always distinct");
+  assert.equal(G.bossMod,'vault','table 5 cycles back to The Vault');
+  assert.equal(G.bossMod2,null,'bosses expose one readable rule at a time');
+  assert.equal(G.blocks.find(b=>b.boss).sealed,true,'The Vault starts sealed');
 }
 {
-  Object.assign(G, { turn: 48, blocks: [] });
+  Object.assign(G, { table: 4, bossOvertime: true, blocks: [] });
   withRandomSeq([0.1], () => spawnBoss());
-  assert.equal(G.bossMod2, null, "boss number 4 (turn 48) stays below the two-mod threshold");
+  assert.equal(G.bossMod,'splitpot','table 4 previews and spawns Split Pot');
+  assert.equal(G.bossMod2, null, "legacy hidden second modifiers stay removed");
 }
 
-/* ---------- cash-out: boss-kill bonus + tally math ---------- */
+assert.ok(Object.values(CARDS).every(c=>Array.isArray(c.tags)&&c.tags.length),'all 89 jokers carry at least one archetype tag');
+
+/* ---------- active boss rules change damage in readable, deterministic ways ---------- */
+{
+  Object.assign(G,{screen:'play',jokers:[],blocks:[],particles:[],floats:[],coinfx:[],activeGoals:[],destroyedThisTurn:0,hitStop:0});
+  const boss={id:'vault-boss',boss:true,dead:false,hp:100,maxhp:100,armor:0,row:0,rowSpan:2,dispRow:0,sealed:true}; G.blocks=[boss]; G.bossMod='vault'; startVolley();
+  const g=bossGeom(boss); hitBlock({x:g.cx,y:g.cy,vx:0,vy:10,r:8,dmg:10,_sideBounces:0,idx:0},boss);
+  assert.equal(boss.hp,99,'The Vault caps unbanked damage at 1');
+  hitBlock({x:g.cx,y:g.cy,vx:0,vy:10,r:8,dmg:10,_sideBounces:2,idx:1},boss);
+  assert.equal(boss.hp,89,'two side bounces crack The Vault seal before damage');
+  assert.equal(boss.sealed,false);
+}
+{
+  const boss={id:'call-boss',boss:true,dead:false,hp:100,maxhp:100,armor:0,row:0,rowSpan:2,dispRow:0}; Object.assign(G,{bossMod:'lastcall',blocks:[boss],jokers:[],hitStop:0}); startVolley();
+  const g=bossGeom(boss); hitBlock({x:g.cx,y:g.cy,vx:0,vy:10,r:8,dmg:4,anchor:true,idx:3},boss);
+  assert.equal(boss.hp,88,'Last Call triples the final ball damage');
+}
+
+/* ---------- hit-stop freezes simulation and adaptive speed removes dead air ---------- */
+{
+  Object.assign(G,{screen:'play',blocks:[],balls:[{x:10,y:10,vx:100,vy:100,r:3}],queue:[],particles:[],floats:[],coinfx:[],hitStop:.02,timeScale:1,manualSpeed:false,flightIdle:0});
+  update(.01); assert.equal(G.balls[0].x,10,'hit-stop does not re-run collision or movement at zero delta');
+  Object.assign(G,{balls:[],queue:[1],fireTimer:99,hitStop:0,flightIdle:0,timeScale:1,manualSpeed:false});
+  update(.91); assert.equal(G.timeScale,1.75,'flight accelerates after 0.9 seconds without a productive hit');
+  update(.9); assert.equal(G.timeScale,3,'flight accelerates again after 1.8 seconds of dead air');
+  G.queue=[]; G.screen='start';
+}
+
+/* ---------- cash-out: boss kill is gated by the score quota ---------- */
 {
   clearMeta();
   Object.assign(G, { table: 3, tstats: { broken: 5, cut: 2, crits: 1 }, pendingCashout: null, coins: 0,
@@ -627,24 +672,23 @@ for (const id of cardIds) assert.ok(validRar.has(CARDS[id].rar), `${id} has a va
     bossKillsThisRun: 0, bossMod: null, bossMod2: null, blocks: [], newUnlocksThisRun: [] });
   const boss = { boss: true, dead: false, hp: 0, maxhp: 100, reward: 20, row: 0, rowSpan: 2, dispRow: 0, col: 0, cw: 1, chh: 1 };
   breakBlock(boss, null);
-  assert.ok(G.pendingCashout, "boss death sets pendingCashout");
-  const expectedBonus = Math.round(20 * coinMult());
-  assert.equal(G.pendingCashout.bossBonus, expectedBonus, "bossBonus equals the computed coin value from the kill");
+  assert.equal(G.bossKilled, true, "boss death starts collection-overtime gating");
+  assert.ok(G.pendingCashout, "boss Cash bonus is preserved through collection overtime");
   const tally = computeCashoutTally();
   assert.equal(tally.broken, G.tstats.broken);
   assert.equal(tally.cut, G.tstats.cut);
   assert.equal(tally.crits, G.tstats.crits);
-  assert.equal(tally.bossBonus, G.pendingCashout.bossBonus);
+  assert.equal(tally.bossBonus, 20);
   assert.equal(tally.clearBonus, tableClearBonus(G.table), "computeCashoutTally's clearBonus matches tableClearBonus(G.table)");
   clearMeta();
 }
 
-/* ---------- enterCashout: consumes pendingCashout, banks the clear bonus, advances turn ---------- */
+/* ---------- enterCashout: consumes pendingCashout without double-counting the volley ---------- */
 {
   Object.assign(G, { table: 2, turn: 9, tstats: { broken: 3, cut: 1, crits: 0 }, pendingCashout: { bossBonus: 15 },
     coins: 100, screen: 'play', coinfx: [] });
   enterCashout();
-  assert.equal(G.turn, 10, "enterCashout increments turn");
+  assert.equal(G.turn, 9, "enterCashout does not increment an already-completed volley");
   assert.equal(G.screen, 'cashout', "enterCashout switches to the cashout screen");
   assert.equal(G.pendingCashout, null, "pendingCashout is consumed");
   assert.equal(G.coins, 100 + tableClearBonus(2), "the table clear bonus is banked");
@@ -671,7 +715,7 @@ for (const id of cardIds) assert.ok(validRar.has(CARDS[id].rar), `${id} has a va
 
   Object.assign(G, { table: 9, screen: 'cashout' });
   getElement('cashoutBtn').onclick();
-  assert.equal(G.screen, 'play', "a later Table-9 clear advances straight into play, not WON again");
+  assert.equal(G.screen, 'shop', "a later Table-9 clear opens the post-boss shop, not WON again");
   clearMeta();
 }
 
@@ -710,7 +754,7 @@ for (const id of cardIds) assert.ok(validRar.has(CARDS[id].rar), `${id} has a va
 {
   clearMeta();
   const fresh = loadMeta();
-  const defaultShape = JSON.stringify({ v: 1, bestTable: 0, bestTurn: 0, bestCoins: 0,
+  const defaultShape = JSON.stringify({ v: 2, bestTable: 0, bestTurn: 0, bestCoins: 0,
     lifetime: { broken: 0, launches: 0, bossKills: 0 }, unlocked: {} });
   assert.equal(JSON.stringify(fresh), defaultShape, "clearMeta resets to defaults");
 
@@ -722,6 +766,14 @@ for (const id of cardIds) assert.ok(validRar.has(CARDS[id].rar), `${id} has a va
   assert.doesNotThrow(() => loadMeta(), "corrupt JSON in storage must not throw");
   const corrupt = loadMeta();
   assert.equal(JSON.stringify(corrupt), defaultShape, "corrupt JSON falls back to defaults");
+
+  storageSet(META_KEY, '');
+  storageSet(LEGACY_META_KEY, JSON.stringify({ v: 1, bestTable: 3, bestTurn: 17, bestCoins: 44,
+    lifetime: { broken: 8, launches: 9, bossKills: 1 }, unlocked: { twins: true } }));
+  const migrated = loadMeta();
+  assert.equal(migrated.v, 2, "v1 meta migrates to v2");
+  assert.equal(migrated.bestTurn, 9, "v1 bestTurn is converted with ceil(old/2)");
+  assert.equal(JSON.parse(storageGet(META_KEY)).bestTurn, 9, "the migrated v2 record is saved durably");
   clearMeta();
 }
 
@@ -730,6 +782,190 @@ for (const id of cardIds) assert.ok(validRar.has(CARDS[id].rar), `${id} has a va
   assert.equal(tableName(1), 'Penny Slots');
   assert.equal(tableName(8), 'The House');
   assert.equal(tableName(10), 'Overtime 2');
+}
+
+/* ---------- Phase 1 board, cadence, stable ids, and cached support analysis ---------- */
+{
+  reset();
+  let geometry = geometrySnapshot();
+  assert.equal(geometry.cols, 7, "the board retains seven columns");
+  assert.equal(geometry.safeRows, 10, "the board exposes ten safe rows");
+  assert.equal(bx(newBlock(3, 0, 1, 'chip', 1, 1)), 175, "column 3 remains the centered joker column");
+  assert.equal(aimWithinBoard(geometry.boardLeft + geometry.ballR, geometry.ballR), true, "normal aim accepts the left board edge");
+  assert.equal(aimWithinBoard(geometry.boardLeft + geometry.ballR - 0.01, geometry.ballR), false, "normal aim rejects canvas gutter space");
+
+  Object.assign(G, { screen: 'play', blocks: [{ boss: false, type: 'chip', dead: false, row: 9 }] });
+  assert.equal(checkLoss(), false, "normal row 9 is safe");
+  Object.assign(G, { screen: 'play', blocks: [{ boss: false, type: 'chip', dead: false, row: 10 }] });
+  assert.equal(checkLoss(), true, "normal row 10 loses");
+  Object.assign(G, { screen: 'play', blocks: [{ boss: true, type: 'chip', dead: false, row: 8, rowSpan: 2 }] });
+  assert.equal(checkLoss(), false, "a two-row boss whose bottom is row 9 is safe");
+  Object.assign(G, { screen: 'play', blocks: [{ boss: true, type: 'chip', dead: false, row: 9, rowSpan: 2 }] });
+  assert.equal(checkLoss(), true, "a two-row boss whose bottom reaches row 10 loses");
+
+  reset(); geometry = geometrySnapshot();
+  G.launchX=geometry.boardLeft+geometry.boardSize*0.25; G.firstReturnX=geometry.boardLeft+geometry.boardSize*0.75;
+  G.balls=[{x:G.launchX,y:geometry.launchY-geometry.cellW,vx:geometry.speed*0.6,vy:-geometry.speed*0.8,r:geometry.ballR}];
+  G.particles=[{x:geometry.boardLeft+geometry.boardSize*0.4,y:geometry.cellW*2,vx:10,vy:-20,r:2,w:3,h:4,rad:5,maxr:6}];
+  G.floats=[{x:geometry.boardLeft+geometry.boardSize*0.6,y:geometry.cellW*3,size:10}];
+  G.coinfx=[{x:geometry.boardLeft+geometry.boardSize*0.7,y:geometry.cellW*4}];
+  const oldRadius=G.balls[0].r;
+  stage.clientWidth=500; stage.clientHeight=300; resize();
+  const resized=geometrySnapshot(), live=G.balls[0], scale=resized.boardSize/geometry.boardSize;
+  assert.ok(Math.abs(G.launchX-(resized.boardLeft+resized.boardSize*0.25))<1e-9, "resize remaps the launcher within centered board bounds");
+  assert.ok(Math.abs(G.firstReturnX-(resized.boardLeft+resized.boardSize*0.75))<1e-9, "resize remaps the pending return point");
+  assert.ok(Math.abs(Math.hypot(live.vx,live.vy)-resized.speed)<1e-9, "resize remaps active ball velocity to the new speed");
+  assert.ok(live.r<oldRadius, "resize remaps the active ball radius");
+  assert.ok(Math.abs(G.particles[0].vx-10*scale)<1e-9&&Math.abs(G.particles[0].vy+20*scale)<1e-9,"resize remaps particle velocity");
+  for(const [key,value] of Object.entries({r:2,w:3,h:4,rad:5,maxr:6}))assert.ok(Math.abs(G.particles[0][key]-value*scale)<1e-9,`resize remaps particle ${key}`);
+  assert.ok(Math.abs(G.particles[0].x-(resized.boardLeft+resized.boardSize*0.4))<1e-9,"resize remaps particle position");
+  assert.ok(Math.abs(G.floats[0].size-10*scale)<1e-9,"resize remaps explicit float size");
+  assert.ok(Math.abs(G.coinfx[0].x-(resized.boardLeft+resized.boardSize*0.7))<1e-9,"resize remaps coin effect position");
+  Object.assign(G,{balls:[],dir:{x:0,y:-1},ballIdx:0,jokers:[],stats:{broken:0},jstate:{}}); spawnBall(false);
+  assert.equal(Math.hypot(G.balls[0].vx,G.balls[0].vy),resized.speed,"queued balls use the resized speed consistently");
+  stage.clientWidth=350; stage.clientHeight=600; G.balls=[]; resize();
+
+  assert.equal(effectiveDifficultyRound(), 1, "Table 1 starts at the legacy difficulty floor");
+  Object.assign(G, { table: 2, roundInTable: 3, bossOvertime: false });
+  assert.equal(effectiveDifficultyRound(), 17, "six-round tables preserve the old twelve-step difficulty bands");
+  const a = newBlock(0, 0, 1, 'chip', 1, 1), b = newBlock(0, 1, 1, 'chip', 1, 1), c = newBlock(4, 1, 1, 'chip', 1, 1);
+  assert.notEqual(a.id, b.id, "new blocks receive stable unique ids");
+  const analysis = analyzeSupport([a, b, c]);
+  assert.deepEqual(Array.from(analysis.anchoredIds).sort(), [a.id, b.id].sort(), "support analysis finds connected anchored blocks without mutating them");
+  assert.deepEqual(Array.from(analysis.unsupportedIds), [c.id], "support analysis identifies unsupported blocks for later cascade work");
+  const supportBlocks=[a,b,c], cached=cachedSupportAnalysis(supportBlocks);
+  assert.strictEqual(cachedSupportAnalysis(supportBlocks),cached,"unchanged support analysis is returned from cache");
+  assert.deepEqual(Array.from(cached.adjacency[a.id]),[b.id],"support analysis exposes useful adjacency");
+  c.col=0;
+  const invalidated=cachedSupportAnalysis(supportBlocks);
+  assert.notStrictEqual(invalidated,cached,"support cache invalidates when block geometry changes");
+  assert.equal(invalidated.unsupportedIds.length,0,"invalidated support analysis reflects the mutation");
+}
+{
+  reset();
+  Object.assign(G,{screen:'play',roundInTable:2,totalVolleys:1,turn:2,blocks:[],jokers:[],coins:0,shopVisits:0,floats:[],coinfx:[]});
+  withRandomSeq(noGapPattern(7),()=>endTurn());
+  assert.equal(G.totalVolleys,2,"round 2 completion counts one volley");
+  assert.equal(G.roundInTable,3,"round 2 advances to round 3");
+  assert.equal(G.screen,'shop',"the shop opens after round 2 only after board resolution");
+  assert.equal(getElement('depthLine').textContent,'3/6',"the HUD resolves before the round-2 shop opens");
+  Object.assign(G,{screen:'play',roundInTable:3});
+  withRandomSeq(noGapPattern(7),()=>endTurn());
+  assert.equal(G.screen,'play',"round 3 does not open a shop");
+  withRandomSeq(noGapPattern(7),()=>endTurn());
+  assert.equal(G.screen,'shop',"the shop opens after round 4");
+
+  Object.assign(G,{screen:'play',roundInTable:6,totalVolleys:5,turn:6,bossOvertime:false,blocks:[newBlock(0,1,1,'chip',1,1)],jokers:[],coins:0,floats:[],coinfx:[]});
+  const priorRow=G.blocks[0].row;
+  withRandomSeq([0.1],()=>endTurn());
+  assert.equal(G.blocks[0].row,priorRow+1,"transition into the boss round descends existing blocks once");
+  assert.equal(G.bossOvertime,true,"round 6 transitions into boss overtime");
+  assert.equal(G.blocks.filter(block=>block.boss).length,1,"round 6 spawns exactly one boss");
+
+  const doomed=[]; for(let row=0;row<10;row++)doomed.push(newBlock(0,row,1,'chip',1,1));
+  Object.assign(G,{screen:'play',roundInTable:2,totalVolleys:1,turn:2,bossOvertime:false,blocks:doomed});
+  withRandomSeq(noGapPattern(7),()=>endTurn());
+  assert.equal(G.screen,'over',"loss resolution takes precedence over opening a scheduled shop");
+}
+{
+  reset();
+  Object.assign(G,{screen:'play',phase:'flight',totalVolleys:6,turn:7,bossKilled:true,tableScore:0,tableQuota:999,blocks:[],balls:[{x:175,y:999,vx:0,vy:0,r:5,_collected:true}],queue:[],firstReturnX:175,coins:0,coinfx:[],volley:{id:1,events:[],breakScore:0,cascadeScore:0,bossDamageScore:0,completedGoals:[],cashBounty:0,settled:false}});
+  update(0.016);
+  assert.equal(G.totalVolleys,6,"a volley is not advanced until its receipt settles");
+  assert.equal(G.phase,'receipt',"every volley, including zero-score, shows a receipt");
+  skipReceipt();
+}
+
+/* ---------- Phase 2: score ledger, goals, receipts, collection overtime ---------- */
+{
+  assert.deepEqual([1,2,3,4,5,6,7,8].map(tableQuotaFor), [300,900,1800,3000,4200,5600,7200,8600]);
+  assert.equal(tableQuotaFor(9), Math.round(8600*1.35), "overtime quota scales from table 8");
+  reset();
+  assert.equal(G.activeGoals.length, 3, "every board starts with exactly three goals");
+  assert.equal(JSON.stringify(G.activeGoals.map(g=>[g.tier,g.bonus,g.cash])), JSON.stringify([['easy',.25,1],['medium',.5,2],['hard',.75,3]]));
+}
+{
+  const block={id:'target',boss:false}, other={id:'other',boss:false};
+  function verify(id,config,setup,type,target,ball){
+    startVolley(); G.activeGoals=[Object.assign({tier:'test',id,label:id,bonus:.25,cash:1,done:false},config||{})];
+    setup(G.volley); evaluateGoals(type,target||block,ball||null);
+    assert.equal(G.activeGoals[0].done,true,id+' completes on its qualifying event');
+  }
+  verify('break2',{need:2},v=>{v.breaks=2;},'break',block,{});
+  verify('pinball',{need:8},v=>{v.impacts=8;},'impact',block,{});
+  startVolley(); G.activeGoals=[{tier:'easy',id:'danger',label:'danger',bonus:.25,cash:1,done:false,targetIds:['target']}]; G.volley.impacts=1;
+  evaluateGoals('impact',block,{}); assert.equal(G.activeGoals[0].done,false,'danger does not complete merely on hit');
+  evaluateGoals('break',block,{}); assert.equal(G.activeGoals[0].done,true,'danger completes when its snapshot target is removed');
+  verify('bank',{need:1},()=>{},'break',block,{_sideBounces:1});
+  verify('cut2',{need:2},v=>{v.cuts=2;},'cut',block);
+  verify('sweep',{targetIds:['target','other']},v=>{v.events=[{type:'break',id:'target'},{type:'cut',id:'other'}];},'cut',other);
+  verify('doublebank',{need:2},()=>{},'break',block,{_sideBounces:2});
+  verify('cut4',{need:4},v=>{v.cuts=4;},'cut',block);
+  verify('target',{targetIds:['target'],limit:5},v=>{v.impacts=5;},'impact',block,{});
+}
+{
+  G.blocks=[]; generateGoals();
+  assert.equal(G.activeGoals.length,0,'an impossible empty board never deals impossible goals');
+  withRandomSeq(Array(30).fill(0),()=>spawnRow());
+  assert.ok(G.blocks.some(b=>b.type==='chip'&&!b.dead),'row generation always leaves at least one playable chip');
+  startVolley(); G.activeGoals=[{id:'target',label:'target',bonus:.75,cash:3,done:false,targetIds:['late'],limit:5}]; G.volley.impacts=6;
+  evaluateGoals('impact',{id:'late'},{}); assert.equal(G.activeGoals[0].done,false,'marked target must be hit within the first five impacts');
+}
+{
+  Object.assign(G,{coins:7,jokers:[],tableScore:0,runScore:0,activeGoals:[],particles:[],floats:[],coinfx:[],destroyedThisTurn:0,stats:{broken:0},tstats:{broken:0,cut:0,crits:0}});
+  startVolley();
+  const chip={id:'score-chip',boss:false,dead:false,col:0,row:0,cw:1,chh:1,dispRow:0,hp:0,maxhp:9,reward:4,kind:'square'};
+  breakBlock(chip,null); breakBlock(chip,null);
+  assert.equal(G.volley.breakScore,9,"a direct chip contributes starting HP exactly once");
+  assert.equal(G.coins,11,"Cash payout remains independent from the score ledger");
+  settleVolley(); settleVolley();
+  assert.equal(G.tableScore,9,"receipt settlement is idempotent");
+  finishReceipt(G.volley.id);
+}
+{
+  Object.assign(G,{coins:0,jokers:['midas'],tableScore:0,runScore:0,activeGoals:[],particles:[],floats:[],coinfx:[],destroyedThisTurn:0,stats:{broken:0},tstats:{broken:0,cut:0,crits:0}});
+  startVolley();
+  breakBlock({id:'midas-chip',boss:false,dead:false,col:0,row:0,cw:1,chh:1,dispRow:0,hp:0,maxhp:4,reward:4,kind:'square'},null);
+  assert.equal(G.coins,6,'Midas and coinMult remain live for normal Cash payouts');
+  assert.equal(G.volley.breakScore,4,'payout jokers do not alter base Score');
+}
+{
+  Object.assign(G,{screen:'play',phase:'flight',coins:5,jokers:[],table:1,roundInTable:1,bossKilled:false,bossOvertime:false,tableScore:0,runScore:0,blocks:[],activeGoals:[],particles:[],floats:[],coinfx:[]});
+  startVolley(); Object.assign(G.volley,{breakScore:10,completedGoals:[{label:'A',bonus:.25,cash:1},{label:'B',bonus:.5,cash:2}],cashBounty:3});
+  settleVolley();
+  assert.equal(G.tableScore,18,'stacked goal multiplier rounds the score once');
+  assert.equal(G.coins,5,'goal Cash bounty waits for receipt settlement');
+  assert.equal(G.phase,'receipt'); assert.equal(getElement('receiptOv').classList.contains('show'),true,'receipt DOM is visible');
+  assert.ok((getElement('receiptOv')._listeners.pointerdown||[]).length>0,'receipt overlay owns its pointer skip listener');
+  assert.ok((getElement('receiptOv')._listeners.click||[]).length>0,'receipt overlay owns its click skip listener');
+  const id=G.volley.id; getElement('receiptOv').dispatchEvent({type:'pointerdown',preventDefault(){}});
+  const settled={coins:G.coins,totalVolleys:G.totalVolleys,phase:G.phase,screen:G.screen};
+  assert.equal(G.coins,8,'fixed bounty becomes Cash after receipt');
+  assert.equal(getElement('receiptOv').classList.contains('show'),false,'receipt DOM hides after skip');
+  finishReceipt(id);
+  assert.deepEqual({coins:G.coins,totalVolleys:G.totalVolleys,phase:G.phase,screen:G.screen},settled,'natural timer and skip converge on identical idempotent state');
+}
+{
+  Object.assign(G,{screen:'play',phase:'transition',table:1,roundInTable:2,bossKilled:false,bossOvertime:false,blocks:[],jokers:[],coins:0,shopVisits:0,floats:[],coinfx:[]});
+  withRandomSeq(noGapPattern(7),()=>endTurn());
+  assert.equal(G.screen,'shop','round 2 opens the scheduled shop');
+  getElement('nextBtn').onclick(); assert.equal(G.phase,'aim','scheduled shop exit restores aiming');
+  Object.assign(G,{table:1,screen:'cashout',phase:'transition',hasWon:false}); getElement('cashoutBtn').onclick();
+  assert.equal(G.screen,'shop','post-cashout path opens the next-table shop');
+  getElement('nextBtn').onclick(); assert.equal(G.phase,'aim','post-cashout shop exit restores aiming');
+}
+{
+  Object.assign(G,{screen:'play',phase:'transition',table:2,roundInTable:6,bossKilled:true,tableScore:10,tableQuota:100,blocks:[],jokers:[],coins:0,shopVisits:0,floats:[],coinfx:[],activeGoals:[]});
+  withRandomSeq(noGapPattern(7),()=>endTurn());
+  assert.equal(G.collectionVolleys,1,"dead boss below quota enters collection overtime");
+  assert.ok(G.blocks.some(b=>b.type==='chip'&&!b.boss),"collection overtime adds a full pressure row");
+}
+{
+  Object.assign(G,{screen:'play',phase:'transition',table:2,roundInTable:6,bossKilled:true,tableScore:100,tableQuota:100,pendingCashout:{bossBonus:12},blocks:[],jokers:[],coins:12,shopVisits:0,floats:[],coinfx:[],activeGoals:[],tstats:{broken:0,cut:0,crits:0}});
+  assert.equal(computeCashoutTally().bossBonus,12,'cashout tally preserves the boss Cash payout through collection gating');
+  endTurn();
+  assert.equal(G.screen,'cashout','meeting quota after boss death cashes out instead of spawning collection pressure');
+  assert.equal(G.coins,12+tableClearBonus(2),'cashout adds only the table bonus after the boss payout was already earned');
 }
 
 console.log("game logic tests: ok");

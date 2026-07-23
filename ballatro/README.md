@@ -1,6 +1,6 @@
 # 🎱 BALLATRO
 
-A single-file mobile web game that mashes **Holedown**'s squishy ball-bouncing with **Balatro**'s joker-card economy. Break the chips, bank the money, stack five jokers, and survive a boss every 12 rounds.
+A single-file mobile web game that mashes **Holedown**'s squishy ball-bouncing with **Balatro**'s joker-card economy. Break the chips, bank the money, stack five jokers, and survive each table's six rounds plus boss overtime.
 
 ![Gameplay](screenshots/gameplay.png)
 
@@ -10,9 +10,11 @@ A single-file mobile web game that mashes **Holedown**'s squishy ball-bouncing w
 
 - **Drag** anywhere to aim, release to fire your stream of balls.
 - **Tap** mid-flight to fast-forward the bounce.
-- Clear the chips before they cross the dashed danger line. **Chips are supported by anchors** — the top row (newest, attached to the ceiling) and the boss (if alive). Break a chip holding up a cluster and the rest **fall off the board**, paying out their value. This is the core skill: aim for the load-bearing block, not the stack above it.
-- Every 4 rounds the **shop** opens — buy, sell, or reroll jokers. You hold five. After round 12, the shop also sells **Ball Packs** for permanent +1 ball (+10 chips first, +6 each after).
-- A **boss brick** drops every 12 rounds. Its armor floors weak hits at 1 damage, so you need damage jokers to punch through before it descends onto you.
+- Clear the chips before they cross the dashed danger line. **Chips are supported by anchors** — the top row (newest, attached to the ceiling) and the boss (if alive). Break a chip holding up a cluster and the rest **fall off the board**, adding their starting HP to Score while retaining their normal Cash payout. This is the core skill: aim for the load-bearing block, not the stack above it.
+- The **shop** opens after rounds 2 and 4, then again after the boss. You hold five jokers, and every shop sells **Ball Packs** for permanent +1 ball ($10 Cash first, +$6 each after).
+- Every table has six normal rounds, followed by a **boss brick** and overtime pressure rows until it falls. Its armor floors weak hits at 1 damage, so you need damage jokers to punch through before it descends onto you.
+- Breaking or cutting chips retains its normal **Cash** payout and also adds the chip's starting HP to **Score**; actual boss damage adds Score. Each board also deals one automatic Easy, Medium, and Hard goal; completed goals stack their score multipliers and award separate Cash bounties.
+- Every volley ends with a receipt. It shows direct, cascade, and boss score, completed goals, the stacked multiplier, and Cash bounties; tap it to skip the animation safely.
 
 ## Tables & Win Condition
 
@@ -20,24 +22,26 @@ Progress through eight named casino floors, each ending with a boss encounter. B
 
 | Table | Rounds | Boss |
 |---|---|---|
-| Penny Slots | 1–12 | Boss 1 |
-| Main Floor | 13–24 | Boss 2 |
-| High Limit | 25–36 | Boss 3 |
-| VIP Room | 37–48 | Boss 4 |
-| Whale Tank | 49–60 | Boss 5 |
-| The Vault | 61–72 | Boss 6 |
-| Owner's Suite | 73–84 | Boss 7 |
-| The House | 85–96 | Boss 8 |
+| Penny Slots | 1–6 + overtime | Boss 1 |
+| Main Floor | 7–12 + overtime | Boss 2 |
+| High Limit | 13–18 + overtime | Boss 3 |
+| VIP Room | 19–24 + overtime | Boss 4 |
+| Whale Tank | 25–30 + overtime | Boss 5 |
+| The Vault | 31–36 + overtime | Boss 6 |
+| Owner's Suite | 37–42 + overtime | Boss 7 |
+| The House | 43–48 + overtime | Boss 8 |
 
-**Win condition:** Defeat the boss at the end of Table 8. You'll see a "YOU BEAT THE HOUSE" screen with your final stats. Choose to continue into **Overtime** (endless tables, numbered 9+) or start a fresh run.
+**Win condition:** Defeat the boss and meet the table Score quota. If the boss falls short of quota, collection overtime adds full pressure rows until the quota is met or the table crushes you. You'll see a "YOU BEAT THE HOUSE" screen after Table 8 and may continue into **Overtime** (endless tables, numbered 9+) or start a fresh run.
 
 **Cash-out ceremony:** When you clear a table, the board pauses and a staggered overlay shows your earnings: chips broken, chips cut (from cascades), crits landed, boss bonus, and a table clear bonus (scales with table difficulty). Bank it all and advance.
 
-**Depth-meter HUD:** The top stat now shows your table name and progress (`X/12` rounds), with a gold bar filling as you advance. When a boss is alive, the bar turns red and the label reads `BOSS`, showing remaining HP.
+**Depth-meter HUD:** The top stat shows your table name and progress (`X/6` rounds), with a gold bar filling as you advance. When a boss is alive, the bar turns red and the label reads `BOSS`, showing remaining HP.
 
 ## Jokers
 
 Five slots, 89 jokers across four rarities. Shop offers roll **55% common / 32% uncommon / 11% rare / 2% legendary** per slot. Cards marked ⚠ are double-edged.
+
+Every joker has gameplay archetype tags (damage, balls, Cash, cascade, precision, shop, risk, or utility). Once your hand develops an identity, one shop slot is biased toward its dominant tag while keeping that slot's original rarity roll; offers remain unique.
 
 ### Rarity tiers & distribution
 
@@ -51,10 +55,10 @@ Five slots, 89 jokers across four rarities. Shop offers roll **55% common / 32% 
 | Joker | Effect | Rarity |
 |---|---|---|
 | 💪 Heavy Chips | +1 damage on every ball | Common |
-| 🏦 Interest | +1 chip per 5 held at round end (cap +8) | Common |
-| 🔦 Laser Sight ⚠ | shows the full reflected aim path, but −25% chips | Common |
+| 🏦 Interest | +$2 Cash per $8 held at round end (cap $16) | Common |
+| 🔦 Laser Sight ⚠ | shows the full reflected aim path, but −25% Cash | Common |
 | 🎱 Extra Ball | +1 ball each launch | Uncommon |
-| 👑 Midas Touch | +50% chips from breaks | Uncommon |
+| 👑 Midas Touch | +50% Cash from breaks | Uncommon |
 | 🎯 Bank Shot | +1 damage per side-wall bounce (max +3) | Uncommon |
 | 🔪 Glass Cannon ⚠ | +3 damage, but −2 balls | Rare |
 | ⚡ Chain Reaction | breaks deal 1 damage to nearby chips | Rare |
@@ -67,24 +71,26 @@ Default aim only shows a straight direction ray — Laser Sight is the only way 
 
 When you destroy 3+ chips in a single turn, a pulsing gold **COMBO ×N** appears at the top of the screen, celebrating your momentum. The number rises with each additional chip destroyed that turn. Combined with turn receipts (which show chip-break and cut counts for large turns), combos reward aggressive, synergistic play.
 
+Support links and `CUT N` badges expose load-bearing targets. Impacts use brief hit-stop, damaged chips crack visibly, and cascades fall in a staggered sequence with rising notes. Flight automatically speeds up after 0.9 and 1.8 seconds without a productive hit, resets on impact, and fast-returns balls once the board is safely behind them; tapping still toggles manual 3× speed.
+
 ### Bank Shot & wall bounces
 
-Bank Shot adds +1 damage per side-wall bounce (left/right walls), capped at **+3 damage per ball flight**. The ceiling no longer counts — near-vertical farming was the exploit. Each copy of Bank Shot raises the cap by 3, so two copies can add up to +6 total. Stacking is still worth building around. Toll Booth (the chip-income cousin) keeps its own separate cap, and Kite retains its first-ceiling-hit niche.
+Bank Shot adds +1 damage per side-wall bounce (left/right walls), capped at **+3 damage per ball flight**. The ceiling no longer counts — near-vertical farming was the exploit. Each copy of Bank Shot raises the cap by 3, so two copies can add up to +6 total. Stacking is still worth building around. Toll Booth (the Cash-income cousin) keeps its own separate cap, and Kite retains its first-ceiling-hit niche.
 
 ## Boss
 
-A full-width, two-row armored brick that arrives every 12 rounds. Damage per hit is `max(1, ball_damage − armor)`, so a wide spray of base balls barely scratches it — Heavy Chips, Glass Cannon, and Bank Shot are the counters, and Skeleton Key directly ignores 2 armor. HP is `baseHp(12*num)*10`; armor is `1 + boss_number`. It drops two extra balls when it dies.
+A full-width, two-row armored brick arrives after round 6. Damage normally uses `max(1, ball_damage − armor)`; HP is `baseHp(12*num)*7`, armor is `1 + ceil(table/2)`, and the Cash reward is 20% of starting HP. The next boss and its rule are previewed in every shop.
 
-Boss fights are no longer a breather: while the boss is alive, every even round still spawns a half-HP pressure row, so you're racing the clock instead of stalling for free. Each boss also rolls one modifier, cleared on death:
+Boss fights are no longer a breather: every second failed boss-overtime volley spawns a half-HP pressure row. Boss rules follow a visible four-table cycle:
 
 | Modifier | Effect |
 |---|---|
-| THE WALL | boss gets +2 armor |
-| THE MISER | breaks pay 50% chips while the boss is alive |
-| THE MAGNET | the launcher recenters every round |
-| THE FOG | no aim line while the boss is alive |
+| THE VAULT | Damage is capped at 1 until a ball banks off two side walls |
+| THE SCISSORS | Cascades forge one-hit guards that cap damage at 1 |
+| LAST CALL | The final ball in each volley deals triple boss damage |
+| SPLIT POT | Lit half takes ×2, dark half ×0.5; the lit side flips each hit |
 
-Chip HP has gotten much tougher. From round 8–10 on, a single launch clears only ~50–70% of a fresh row — full clears become rare, and you'll triage which blocks to target while letting the rest descend.
+Chip HP gets much tougher by rounds 5–6 and in later tables. A single launch clears only ~50–70% of a fresh row — full clears become rare, and you'll triage which blocks to target while letting the rest descend.
 
 ## Meta-Progression
 
@@ -115,20 +121,20 @@ Locked jokers don't appear in the shop until unlocked. The pool remains healthy 
 
 ## Tech
 
-- One `index.html`. Vanilla JS + Canvas. **No dependencies, no build step, no assets.**
+- One `index.html`. Vanilla JS + Canvas. **No build step or bundled assets.**
 - Real circle-vs-convex-polygon collision so the irregular multi-cell blocks bounce off their actual angled faces.
 - Chips render from a lazily-built, per-tier sprite cache (casino chip look: rim, edge spots, printed ring, sheen) instead of being redrawn as flat polygons every frame.
 - WebAudio for all sound (synthesized, nothing to download).
-- `localStorage` for meta-progression (best table, lifetime stats, unlocked joker IDs); in-memory fallback if unavailable. No network calls — fully offline except for persistence. Drop it on any static host.
+- `localStorage` for meta-progression (best table, lifetime stats, unlocked joker IDs); in-memory fallback if unavailable. Display fonts load from Google Fonts with system fallbacks, so gameplay still works if the font request is unavailable.
 
 ## Tuning knobs
 
 The values worth nudging are near the top of the script in `index.html`:
 
 - `spawnRow()` — `baseHp(t) = 1 + round(t^1.3 / 2.6)` (difficulty curve; drop divisor toward 2.2 to harden further); gap tightening `(0.8+rand*0.4)`; ball-pickup rate
-- `endTurn()` — boss pressure-row cadence (`G.turn%2===0` half-HP rows while a boss is alive)
+- `endTurn()` — six-round table cadence and half-HP pressure rows during boss overtime
 - `spawnBoss()` — boss HP / armor scaling and the `BOSS_MODS` modifier pool
-- `wallHit()` — Bank Shot's per-ball damage cap (+3 per copy) and Toll Booth's per-launch chip cap (4)
+- `wallHit()` — Bank Shot's per-ball damage cap (+3 per copy) and Toll Booth's per-launch Cash cap ($4)
 - `REWARD` table — block payouts by denomination tier (indexed 0–5 for chips ≤1, ≤3, ≤6, ≤10, ≤16, ∞ HP)
 - `PRICE` / `cardPrice()` / `sellValue()` — rarity-based shop economy (common/uncommon/rare/legendary base prices, growth +1 per shop visit, coupon/pack discounts, 2-chip floor)
 - `pickRarity()` — shop offer rarity weights (55/32/11/2)

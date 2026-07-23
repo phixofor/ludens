@@ -199,7 +199,8 @@ const G={ screen:'start', coins:0, turn:1, best:0, jokers:[], blocks:[], balls:[
 
 function reset(){
   Object.assign(G,{coins:0,turn:1,jokers:[],blocks:[],balls:[],queue:[],launchX:W/2,dir:null,aiming:false,
-    particles:[],floats:[],coinfx:[],destroyedThisTurn:0,timeScale:1,shopVisits:0,bonusBalls:0});
+    particles:[],floats:[],coinfx:[],destroyedThisTurn:0,timeScale:1,firstReturnX:null,fireTimer:0,
+    shake:0,shopVisits:0,bonusBalls:0,rerollCost:3,offers:[]});
   spawnRow(); descend(); spawnRow(); descend(); spawnRow();
   renderHand(); syncTop();
 }
@@ -213,7 +214,7 @@ function newBlock(col,row,hp,type,cw,chh){
           reward:Math.max(1,Math.round(hp*0.4)),squash:0,flash:0,dead:false,boss:false};
 }
 function descend(){ for(const b of G.blocks) b.row++; }
-function bossAlive(){ return G.blocks.some(b=>b.boss); }
+function bossAlive(){ return G.blocks.some(b=>b.boss&&!b.dead); }
 function spawnRow(){
   const t=G.turn, baseHp=1+Math.floor(t/2.2); let c=0, pick=false;
   while(c<COLS){
@@ -280,7 +281,7 @@ function breakBlock(b,ball){
   let c=Math.round(b.reward*coinMult());
   if(G.destroyedThisTurn>0) c+=count('combo');
   for(let i=0;i<count('lucky');i++) if(Math.random()<0.25)c+=2;
-  const ok=count('overkill'); if(ok>0&&ball)c+=Math.max(0,ball.dmg-(b._hpBefore||0))*ok;
+  const ok=count('overkill'); if(ok>0&&ball)c+=Math.max(0,(b._hitDamage||0)-(b._hpBefore||0))*ok;
   G.destroyedThisTurn++;
   const px=b.boss?W/2:bx(b), py=b.boss?bossGeom(b).cy:by(b);
   addCoins(c,px,py); floatText(px,py-cellH*0.3,'+'+c,'#f2c14e');
@@ -317,7 +318,7 @@ function hitBlock(ball,b){
       else if(mn===ot){n=[0,-1];ball.y=g.cy-g.hh-ball.r;}else{n=[0,1];ball.y=g.cy+g.hh+ball.r;} }
     else{ const d=Math.sqrt(d2); n=[dx/d,dy/d]; ball.x=nx+n[0]*ball.r; ball.y=ny+n[1]*ball.r; }
     const dot=ball.vx*n[0]+ball.vy*n[1]; ball.vx-=2*dot*n[0]; ball.vy-=2*dot*n[1];
-    b._hpBefore=b.hp; const eff=Math.max(1,ball.dmg-(b.armor||0)); b.hp-=eff; b.squash=0.5; b.flash=1;
+    b._hpBefore=b.hp; const eff=Math.max(1,ball.dmg-(b.armor||0)); b._hitDamage=eff; b.hp-=eff; b.squash=0.5; b.flash=1;
     sHit(G.destroyedThisTurn); if(b.hp<=0)breakBlock(b,ball); return true;
   }
   const cx0=bx(b),cy0=by(b), R=Math.hypot(b.cw,b.chh)*0.5*cellW+ball.r;
@@ -325,7 +326,7 @@ function hitBlock(ball,b){
   const h=polyHit(ball.x-cx0,ball.y-cy0,ball.r,b.shape,cellW); if(!h)return false;
   ball.x=cx0+h.ux*cellW; ball.y=cy0+h.uy*cellW;
   const dot=ball.vx*h.nx+ball.vy*h.ny; ball.vx-=2*dot*h.nx; ball.vy-=2*dot*h.ny;
-  b._hpBefore=b.hp; b.hp-=ball.dmg; b.squash=1; b.flash=1; sHit(G.destroyedThisTurn);
+  b._hpBefore=b.hp; b._hitDamage=ball.dmg; b.hp-=ball.dmg; b.squash=1; b.flash=1; sHit(G.destroyedThisTurn);
   if(b.hp<=0)breakBlock(b,ball); return true;
 }
 function moveBall(ball,dt){
@@ -499,8 +500,9 @@ function refreshShop(){ const price=cardPrice();
   const rb=document.getElementById('rerollBtn'); rb.textContent='Reroll ('+G.rerollCost+')'; rb.disabled=G.coins<G.rerollCost;
   const own=document.getElementById('ownedRow'); own.innerHTML='';
   G.jokers.forEach((id,idx)=>{ const c=CARDS[id]; const o=document.createElement('div'); o.className='owned'+(c.bad?' bad':'');
-    o.innerHTML='<div class="ic">'+c.ic+'</div><div class="sv">+'+sellValue()+'</div>';
-    o.onclick=()=>{ G.jokers.splice(idx,1); G.coins+=sellValue(); sCoin(); renderHand(); renderShop(); };
+    const value=sellValue();
+    o.innerHTML='<div class="ic">'+c.ic+'</div><div class="sv">+'+value+'</div>';
+    o.onclick=()=>{ G.jokers.splice(idx,1); G.coins+=value; sCoin(); renderHand(); renderShop(); };
     own.appendChild(o); }); }
 document.getElementById('rerollBtn').onclick=()=>{ if(G.coins<G.rerollCost)return; G.coins-=G.rerollCost; G.rerollCost+=2; buildOffers(); };
 document.getElementById('nextBtn').onclick=()=>{ shopOv.classList.remove('show'); G.screen='play'; checkLoss(); };

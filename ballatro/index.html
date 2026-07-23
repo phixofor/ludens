@@ -61,6 +61,7 @@
   .shopcard:active{transform:translateY(3px);}
   .shopcard.disabled{opacity:.4;pointer-events:none;}
   .shopcard.bad{box-shadow:0 6px 0 rgba(0,0,0,.3), inset 0 0 0 2px var(--danger);}
+  .shopcard.ballpack{background:linear-gradient(160deg,#eaf2ff,#cfe0f6);box-shadow:0 6px 0 rgba(0,0,0,.3), inset 0 0 0 2px var(--blue);}
   .shopcard .ic{font-size:32px;}
   .shopcard .nm{font-weight:700;font-size:13px;letter-spacing:.3px;}
   .shopcard .ds{font-size:11px;line-height:1.35;opacity:.8;min-height:44px;}
@@ -145,6 +146,7 @@ function sCoin(){ beep(880,.05,'square',.12); setTimeout(()=>beep(1180,.06,'squa
 function sLaunch(){ beep(520,.08,'sine',.12); }
 function sBall(){ beep(1400,.07,'square',.16); setTimeout(()=>beep(1760,.09,'square',.16),60); }
 function sBoss(){ [220,180,140].forEach((f,i)=>setTimeout(()=>beep(f,.3,'sawtooth',.2),i*90)); }
+function sFall(){ beep(220,.09,'sine',.1); setTimeout(()=>beep(150,.1,'sine',.08),55); }
 function sOver(){ [400,320,240,160].forEach((f,i)=>setTimeout(()=>beep(f,.22,'sawtooth',.16),i*130)); }
 
 /* ---------- shapes (unit polygons, origin inside) ---------- */
@@ -164,8 +166,9 @@ const BASE={
   triUp:[[0,-1],[0.95,0.8],[-0.95,0.8]],
   triDn:[[0,1],[0.95,-0.8],[-0.95,-0.8]],
 };
+(function(){ const PC=0.94, ch=0.18*PC;
+  BASE.plaque=[[-PC+ch,-PC],[PC-ch,-PC],[PC,-PC+ch],[PC,PC-ch],[PC-ch,PC],[-PC+ch,PC],[-PC,PC-ch],[-PC,-PC+ch]]; })();
 const BAG=['square','hex','hex','diamond','pent','oct','triUp','triDn'];
-const WIDE_BAG=['hex','oct','pent','diamond']; // shapes that read well when stretched
 function makeShape(kind,cw,chh){ const sx=cw*0.46, sy=chh*0.46;
   return poly(BASE[kind].map(p=>[p[0]*sx, p[1]*sy])); }
 
@@ -189,21 +192,21 @@ const CARDS={
   heavy:   {ic:'\uD83D\uDCAA', nm:'Heavy Chips', ds:'+1 damage on every ball.', jc:'#d64550', rar:'common'},
   rapid:   {ic:'\uD83C\uDFB1', nm:'Extra Ball', ds:'+1 ball each launch.', jc:'#3f6fb0', rar:'uncommon'},
   midas:   {ic:'\uD83D\uDC51', nm:'Midas Touch', ds:'+50% chips from breaks.', jc:'#c9922b', rar:'uncommon'},
-  interest:{ic:'\uD83C\uDFE6', nm:'Interest', ds:'Round end: +1 chip / 5 held.', jc:'#2f8f5b', rar:'common'},
+  interest:{ic:'\uD83C\uDFE6', nm:'Interest', ds:'Round end: +1 chip / 8 held (max 8).', jc:'#2f8f5b', rar:'common'},
   combo:   {ic:'\u26D3\uFE0F', nm:'Combo', ds:'+1 chip per extra break in a turn.', jc:'#7a4fb0', rar:'common'},
   lucky:   {ic:'\uD83C\uDF40', nm:'Lucky Chip', ds:'25% chance a break drops +2.', jc:'#2f8f5b', rar:'common'},
   overkill:{ic:'\uD83D\uDCA5', nm:'Overkill', ds:'Wasted kill damage becomes chips.', jc:'#d64550', rar:'uncommon'},
-  bank:    {ic:'\uD83C\uDFAF', nm:'Bank Shot', ds:'+1 dmg per wall bounce (max +3).', jc:'#3f6fb0', rar:'uncommon'},
+  bank:    {ic:'\uD83C\uDFAF', nm:'Bank Shot', ds:'+1 dmg per side-wall bounce (max +3).', jc:'#3f6fb0', rar:'uncommon'},
   laser:   {ic:'\uD83D\uDD26', nm:'Laser Sight', ds:'Show full bounce path. \u221225% chips.', jc:'#e8452e', bad:true, rar:'common'},
   glass:   {ic:'\uD83D\uDD2A', nm:'Glass Cannon', ds:'+3 damage, but \u22122 balls.', jc:'#d64550', bad:true, rar:'rare'},
-  highroller:{ic:'\uD83C\uDFB2', nm:'High Roller', ds:'Chips \u00D72, but pay 4 to launch.', jc:'#7a4fb0', bad:true, rar:'rare'},
+  highroller:{ic:'\uD83C\uDFB2', nm:'High Roller', ds:'Chips \u00D71.5, but pay 6 to launch.', jc:'#7a4fb0', bad:true, rar:'rare'},
   hive:    {ic:'\uD83D\uDC1D', nm:'Hive Mind', ds:'Hex chips pay double.', jc:'#c9922b', rar:'common'},
   edgelord:{ic:'\uD83D\uDD3B', nm:'Edge Lord', ds:'Triangles take +2 damage.', jc:'#d64550', rar:'common'},
   blockhead:{ic:'\uD83E\uDDF1', nm:'Blockhead', ds:'Squares pay +4 chips.', jc:'#3f6fb0', rar:'common'},
   firstblood:{ic:'\uD83D\uDDE1\uFE0F', nm:'First Blood', ds:'First break each launch pays double.', jc:'#e8452e', rar:'common'},
   piggy:   {ic:'\uD83D\uDC37', nm:'Piggy Bank', ds:'+2 chips at round end.', jc:'#f2c14e', rar:'common'},
   recycler:{ic:'\u267B\uFE0F', nm:'Recycler', ds:'Rerolls cost 2 less (min 1).', jc:'#2f8f5b', rar:'common'},
-  toll:    {ic:'\uD83C\uDFAB', nm:'Toll Booth', ds:'+1 chip per wall bounce (max 8/launch).', jc:'#3f6fb0', rar:'uncommon'},
+  toll:    {ic:'\uD83C\uDFAB', nm:'Toll Booth', ds:'+1 chip per wall bounce (max 4/launch).', jc:'#3f6fb0', rar:'uncommon'},
   coupon:  {ic:'\uD83C\uDF9F\uFE0F', nm:'Coupon Book', ds:'Shop jokers cost 2 less (min 2).', jc:'#2f8f5b', rar:'uncommon'},
   juggler: {ic:'\uD83E\uDD39', nm:'Juggler', ds:'+1 ball per 2 other jokers held.', jc:'#7a4fb0', rar:'uncommon'},
   anchor:  {ic:'\u2693', nm:'Anchor Ball', ds:'Last ball each launch deals bonus damage.', jc:'#3f6fb0', rar:'uncommon'},
@@ -213,49 +216,137 @@ const CARDS={
   twins:   {ic:'\uD83D\uDC6F', nm:'Doppelganger', ds:'Counts as a copy of your leftmost other joker.', jc:'#7a4fb0', rar:'rare'},
   chain:   {ic:'\u26A1', nm:'Chain Reaction', ds:'Breaks deal 1 damage to nearby chips.', jc:'#d64550', rar:'rare'},
   snowball:{ic:'\u2603\uFE0F', nm:'Snowball', ds:'+1 ball damage per 30 chips broken.', jc:'#3f6fb0', rar:'rare'},
-  loanshark:{ic:'\uD83E\uDD88', nm:'Loan Shark', ds:'+30 chips on buy, \u22122 every round end.', jc:'#e8452e', bad:true, rar:'rare'},
-  investor:{ic:'\uD83D\uDCC8', nm:'Investor', ds:'+15% chip mult per shop visited.', jc:'#2f8f5b', rar:'rare'},
+  loanshark:{ic:'\uD83E\uDD88', nm:'Loan Shark', ds:'+18 chips on buy, \u22122 every round end.', jc:'#e8452e', bad:true, rar:'rare'},
+  investor:{ic:'\uD83D\uDCC8', nm:'Investor', ds:'+10% chip mult per shop visited (max 6).', jc:'#2f8f5b', rar:'rare'},
+  demolition:{ic:'\uD83E\uDDE8', nm:'Demolitionist', ds:'Fallen chips pay +1 each.', jc:'#e8452e', rar:'common'},
+  avalanche:{ic:'\uD83C\uDFD4\uFE0F', nm:'Avalanche', ds:'Each fall permanently adds +1 ball damage (max +10).', jc:'#3f6fb0', rar:'rare'},
+  headhunter:{ic:'\uD83D\uDD31', nm:'Headhunter', ds:'+15% crit chance; crits execute chips at \u22643 HP.', jc:'#d64550', rar:'rare'},
+  phalanx:{ic:'\uD83D\uDEE1\uFE0F', nm:'Phalanx', ds:'+5% pierce chance; pierced balls keep +1 damage per pierce.', jc:'#3f6fb0', rar:'rare'},
+  shatterpoint:{ic:'\uD83D\uDCA0', nm:'Shatterpoint', ds:'Splash hits all neighbors; +1 dmg per 2 breaks this turn (max +6).', jc:'#7a4fb0', rar:'rare'},
+  lowroller:{ic:'\uD83C\uDC04', nm:'Low Roller', ds:'$1-$2 chips pay \u00D73; $1000+ chips pay \u00D70.', jc:'#7a4fb0', bad:true, rar:'rare'},
+  timebomb:{ic:'\u23F0', nm:'Time Bomb', ds:'Every 5th ball: +5 damage, skips wall bonuses.', jc:'#e8452e', bad:true, rar:'rare'},
+  highstakes:{ic:'\uD83D\uDCB5', nm:'High Stakes', ds:'Rerolls cost double; shop always shows 1 uncommon+.', jc:'#7a4fb0', bad:true, rar:'rare'},
+  hallofmirrors:{ic:'\uD83E\uDE9E', nm:'Hall of Mirrors', ds:'On break, replays your rightmost other joker\u2019s effect.', jc:'#c9922b', rar:'rare'},
+  wildcard:{ic:'\uD83C\uDCCF', nm:'Wild Card', ds:'Counts as one copy of every joker you hold.', jc:'#f2c14e', rar:'legendary'},
+  ghostchip:{ic:'\uD83D\uDC7B', nm:'Ghost Chip', ds:'Balls always pierce killed chips.', jc:'#f2c14e', rar:'legendary'},
+  jackpot:{ic:'\uD83C\uDFB0', nm:'Jackpot', ds:'Every break: 1% chance to pay \u00D750.', jc:'#f2c14e', rar:'legendary'},
+  ouroboros:{ic:'\u267E\uFE0F', nm:'Ouroboros', ds:'Your leftmost other joker\u2019s effect counts double.', jc:'#f2c14e', rar:'legendary'},
+  flint:{ic:'\uD83D\uDD25', nm:'Flint Spark', ds:'3% crit chance: hits deal \u00D72 damage.', jc:'#d64550', rar:'common'},
+  snipe:{ic:'\uD83D\uDD2B', nm:'Snipe', ds:'Breaks in the bottom-most row pay +2.', jc:'#3f6fb0', rar:'common'},
+  corner:{ic:'\uD83D\uDCD0', nm:'Corner Pocket', ds:'Breaks in the leftmost/rightmost column pay +1.', jc:'#2f8f5b', rar:'common'},
+  lookout:{ic:'\uD83D\uDD2D', nm:'Lookout', ds:'Breaks in the center column pay +1.', jc:'#2f8f5b', rar:'common'},
+  arrowhead:{ic:'\uD83C\uDFF9', nm:'Arrowhead', ds:'4% chance a kill doesn\u2019t bounce the ball.', jc:'#3f6fb0', rar:'common'},
+  trickle:{ic:'\uD83D\uDCA6', nm:'Trickle', ds:'Hits deal 1 splash damage to a neighbor.', jc:'#3f6fb0', rar:'common'},
+  leadball:{ic:'\uD83E\uDD47', nm:'Lead Ball', ds:'First ball each launch: +1 damage.', jc:'#d64550', rar:'common'},
+  windup:{ic:'\uD83C\uDF00', nm:'Wind-Up', ds:'Every 3rd ball launched: +1 damage.', jc:'#d64550', rar:'common'},
+  freebie:{ic:'\uD83C\uDF81', nm:'Freebie', ds:'Your first reroll each shop is free.', jc:'#2f8f5b', rar:'common'},
+  thrifty:{ic:'\uD83E\uDDFA', nm:'Thrifty', ds:'Selling a joker pays +1 extra chip.', jc:'#2f8f5b', rar:'common'},
+  lowballer:{ic:'\uD83C\uDFF7\uFE0F', nm:'Low-Baller', ds:'Shop prices +1, rerolls cost 1 less.', jc:'#e8452e', bad:true, rar:'common'},
+  coinflip:{ic:'\uD83E\uDE99', nm:'Coin Flip', ds:'Breaks pay double or nothing (50/50).', jc:'#e8452e', bad:true, rar:'common'},
+  dud:{ic:'\uD83E\uDEAB', nm:'Dud Battery', ds:'\u22121 damage, but +1 ball.', jc:'#e8452e', bad:true, rar:'common'},
+  riser:{ic:'\uD83C\uDF88', nm:'Riser', ds:'Falling chips pay 0, but +1 ball.', jc:'#e8452e', bad:true, rar:'common'},
+  stash:{ic:'\uD83D\uDCB0', nm:'Stash', ds:'Round end: +1 chip per joker held.', jc:'#f2c14e', rar:'common'},
+  jinx:{ic:'\uD83D\uDD2E', nm:'Jinx', ds:'Round end: +1 chip per bad joker held.', jc:'#7a4fb0', rar:'common'},
+  gem:{ic:'\uD83D\uDC8E', nm:'Gem Cutter', ds:'Breaks of $100+ chips pay +1.', jc:'#3f6fb0', rar:'common'},
+  pebble:{ic:'\uD83E\uDEA8', nm:'Pebble', ds:'Breaks of $1 chips pay +1.', jc:'#8fa8a0', rar:'common'},
+  bruiser:{ic:'\uD83E\uDD4A', nm:'Bruiser', ds:'$1 chips die to any hit.', jc:'#d64550', rar:'common'},
+  streak:{ic:'\uD83D\uDD17', nm:'Streak', ds:'3rd break in a turn pays +3.', jc:'#7a4fb0', rar:'common'},
+  tripwire:{ic:'\uD83E\uDE9D', nm:'Tripwire', ds:'Breaks in the newest row pay +1.', jc:'#2f8f5b', rar:'common'},
+  icebreaker:{ic:'\uD83E\uDDCA', nm:'Icebreaker', ds:'Falls deal 1 damage to a neighbor.', jc:'#3f6fb0', rar:'common'},
+  sentry:{ic:'\uD83D\uDD79\uFE0F', nm:'Sentry', ds:'Breaks in the bottom third: ball +1 damage.', jc:'#d64550', rar:'common'},
+  magnet:{ic:'\uD83E\uDDF2', nm:'Magnet', ds:'After a kill, that ball\u2019s next hit: +1 damage.', jc:'#d64550', rar:'common'},
+  stopwatch:{ic:'\u23F1\uFE0F', nm:'Stopwatch', ds:'Balls after the 4th: +1 damage.', jc:'#d64550', rar:'common'},
+  receipt:{ic:'\uD83E\uDDFE', nm:'Receipt', ds:'Buying a joker refunds 1 chip.', jc:'#2f8f5b', rar:'common'},
+  hardhat:{ic:'\u26D1\uFE0F', nm:'Hard Hat', ds:'+2 damage vs the boss, \u22121 vs chips.', jc:'#e8452e', bad:true, rar:'common'},
+  lastcall:{ic:'\uD83D\uDD14', nm:'Last Call', ds:'Last ball each launch: +2 damage.', jc:'#d64550', rar:'common'},
+  blastcap:{ic:'\uD83D\uDCA3', nm:'Blast Cap', ds:'Falls deal 2 splash damage to neighbors.', jc:'#d64550', rar:'uncommon'},
+  ricochet:{ic:'\uD83C\uDFB3', nm:'Ricochet', ds:'8% pierce chance.', jc:'#3f6fb0', rar:'uncommon'},
+  hotstreak:{ic:'\uD83C\uDF36\uFE0F', nm:'Hot Streak', ds:'6% crit chance; crits pay +2 chips.', jc:'#d64550', rar:'uncommon'},
+  wideshot:{ic:'\uD83E\uDDEF', nm:'Wide Shot', ds:'Splash damage +2.', jc:'#3f6fb0', rar:'uncommon'},
+  clutch:{ic:'\uD83D\uDEA8', nm:'Clutch', ds:'Breaks in the bottom row pay \u00D72.', jc:'#e8452e', rar:'uncommon'},
+  deadcenter:{ic:'\uD83E\uDDFF', nm:'Dead Center', ds:'Center-column hits deal \u00D72 damage.', jc:'#d64550', rar:'uncommon'},
+  vault:{ic:'\uD83C\uDFDB\uFE0F', nm:'Vault', ds:'Shop offers 1 extra card.', jc:'#c9922b', rar:'uncommon'},
+  pricefreeze:{ic:'\u2744\uFE0F', nm:'Price Freeze', ds:'Prices stop rising after 15 visits.', jc:'#3f6fb0', rar:'uncommon'},
+  doubledown:{ic:'\uD83C\uDFB4', nm:'Double Down', ds:'Round end: +3 chips if all 5 slots are full.', jc:'#7a4fb0', rar:'uncommon'},
+  minimalist:{ic:'\uD83E\uDDF5', nm:'Minimalist', ds:'+2 damage, but \u22121 ball per joker past your 2nd.', jc:'#e8452e', bad:true, rar:'uncommon'},
+  riptide:{ic:'\uD83C\uDF0A', nm:'Riptide', ds:'Kills splash 1 damage across their row.', jc:'#3f6fb0', rar:'uncommon'},
+  boomerang:{ic:'\uD83E\uDE83', nm:'Boomerang', ds:'12% pierce chance, but pierced hits deal \u22121 damage.', jc:'#e8452e', bad:true, rar:'uncommon'},
+  nightowl:{ic:'\uD83E\uDD89', nm:'Night Owl', ds:'Breaks of $500+ chips pay \u00D72.', jc:'#7a4fb0', rar:'uncommon'},
+  undertow:{ic:'\uD83D\uDD73\uFE0F', nm:'Undertow', ds:'Breaks in the bottom row splash 2 damage.', jc:'#3f6fb0', rar:'uncommon'},
+  bullmarket:{ic:'\uD83D\uDCB9', nm:'Bull Market', ds:'Sell value +20% (min +1).', jc:'#2f8f5b', rar:'uncommon'},
+  stockpile:{ic:'\uD83C\uDFD7\uFE0F', nm:'Stockpile', ds:'Round end: +1 chip per 10 banked (max +5).', jc:'#2f8f5b', rar:'uncommon'},
+  warhead:{ic:'\u2620\uFE0F', nm:'Warhead', ds:'10% crit chance, but non-crit hits deal \u22121 damage.', jc:'#e8452e', bad:true, rar:'uncommon'},
+  overtime:{ic:'\u23F3', nm:'Overtime', ds:'Balls after the 6th: +3 damage.', jc:'#d64550', rar:'uncommon'},
+  lastlaugh:{ic:'\uD83E\uDD42', nm:'Last Laugh', ds:'Last ball: +3 damage, but non-kill hits cost 1 chip.', jc:'#e8452e', bad:true, rar:'uncommon'},
 };
 const CARD_IDS=Object.keys(CARDS);
-const RAR_COLORS={common:'#8fa8a0',uncommon:'#4fb06a',rare:'#d64550'};
+const RAR_COLORS={common:'#8fa8a0',uncommon:'#4fb06a',rare:'#d64550',legendary:'#f2c14e'};
 function rawCount(id){ return G.jokers.filter(j=>j===id).length; }
-function leftmostOther(){ for(const j of G.jokers) if(j!=='twins') return j; return null; }
-function count(id){ if(id==='twins')return rawCount(id);
-  let c=rawCount(id); if(leftmostOther()===id) c+=rawCount('twins'); return c; }
+function leftmostOtherThan(id){ for(const j of G.jokers) if(j!==id) return j; return null; }
+function leftmostOther(){ return leftmostOtherThan('twins'); }
+function rightmostOther(id){ for(let i=G.jokers.length-1;i>=0;i--) if(G.jokers[i]!==id) return G.jokers[i]; return null; }
+function count(id){
+  let c=rawCount(id);
+  if(id!=='twins' && leftmostOther()===id) c+=rawCount('twins');
+  if(id!=='wildcard' && rawCount(id)>0) c+=rawCount('wildcard');
+  if(id!=='ouroboros' && leftmostOtherThan('ouroboros')===id && rawCount('ouroboros')>0) c+=1;
+  return c;
+}
+function critChance(){ return Math.min(0.6, 0.03*count('flint')+0.06*count('hotstreak')+0.10*count('warhead')+0.15*count('headhunter')); }
+function pierceChance(){ if(count('ghostchip')>0) return 1; return Math.min(0.6, 0.04*count('arrowhead')+0.08*count('ricochet')+0.12*count('boomerang')+0.05*count('phalanx')); }
+function splashDmg(){ return 1*count('trickle')+2*count('wideshot')+Math.min(6,Math.floor((G.destroyedThisTurn||0)/2))*count('shatterpoint'); }
+function splashHit(origin,dmg){ if(dmg<=0)return; const cx=bx(origin),cy=by(origin);
+  for(const ob of G.blocks){ if(ob.dead||ob===origin||ob.boss||ob.type!=='chip')continue;
+    if(Math.hypot(bx(ob)-cx,by(ob)-cy)<=1.1*cellW){ ob.hp-=dmg; ob.flash=1; ob.squash=0.5; if(ob.hp<=0)breakBlock(ob,null); } } }
+function rowSplashHit(origin,dmg){ if(dmg<=0)return;
+  for(const ob of G.blocks){ if(ob.dead||ob===origin||ob.boss||ob.type!=='chip'||ob.row!==origin.row)continue;
+    ob.hp-=dmg; ob.flash=1; ob.squash=0.5; if(ob.hp<=0)breakBlock(ob,null); } }
+function maxActiveRow(){ let m=-1; for(const bl of G.blocks) if(!bl.dead&&bl.type==='chip'&&!bl.boss) m=Math.max(m,bl.row); return m; }
+function replayBonus(id,b,ball){
+  if(id==='blockhead') return (!b.boss && b.kind==='square') ? 4*count('blockhead') : 0;
+  if(id==='combo') return G.destroyedThisTurn>0 ? count('combo') : 0;
+  if(id==='overkill') return ball ? Math.max(0,(b._hitDamage||0)-(b._hpBefore||0))*count('overkill') : 0;
+  return 0;
+}
 function ballCount(){ const other=G.jokers.length-rawCount('juggler');
-  return Math.max(1, 4+count('rapid')+(G.bonusBalls||0)-2*count('glass')+count('juggler')*Math.floor(other/2)+2*count('candle')); }
-function ballDmg(){ return 1+count('heavy')+3*count('glass')+Math.floor((G.stats.broken||0)/30)*count('snowball'); }
-function coinMult(){ let m=1+0.5*count('midas')+0.15*(G.jstate.inv||0)*count('investor');
-  m*=Math.pow(0.75,count('laser')); m*=Math.pow(2,count('highroller'));
+  return Math.max(1, 4+count('rapid')+(G.bonusBalls||0)-2*count('glass')+count('juggler')*Math.floor(other/2)+2*count('candle')
+    +count('dud')+count('riser')-Math.max(0,G.jokers.length-2)*count('minimalist')); }
+function ballDmg(){ return 1+count('heavy')+3*count('glass')+Math.floor((G.stats.broken||0)/30)*count('snowball')+(G.jstate.avalanche||0)
+  -1*count('dud')+2*count('minimalist'); }
+function coinMult(){ let m=1+0.5*count('midas')+0.1*Math.min(6,G.jstate.inv||0)*count('investor');
+  m*=Math.pow(0.75,count('laser')); m*=Math.pow(1.5,count('highroller'));
   if(G.bossMod==='miser'&&bossAlive())m*=0.5; return m; }
 
 /* ---------- state ---------- */
 const G={ screen:'start', coins:0, turn:1, best:0, jokers:[], blocks:[], balls:[], queue:[], fireTimer:0,
   launchX:null, dir:null, aiming:false, particles:[], floats:[], coinfx:[], destroyedThisTurn:0,
   timeScale:1, firstReturnX:null, shake:0, shopVisits:0, bonusBalls:0, rerollCost:3, offers:[],
-  jstate:{}, stats:{broken:0}, bossMod:null, tollThisLaunch:0 };
+  jstate:{}, stats:{broken:0}, bossMod:null, tollThisLaunch:0, _died:false };
 
 function reset(){
   Object.assign(G,{coins:0,turn:1,jokers:[],blocks:[],balls:[],queue:[],launchX:W/2,dir:null,aiming:false,
     particles:[],floats:[],coinfx:[],destroyedThisTurn:0,timeScale:1,firstReturnX:null,fireTimer:0,
-    shake:0,shopVisits:0,bonusBalls:0,rerollCost:3,offers:[],jstate:{},stats:{broken:0},bossMod:null,tollThisLaunch:0});
+    shake:0,shopVisits:0,bonusBalls:0,rerollCost:3,offers:[],jstate:{},stats:{broken:0},bossMod:null,tollThisLaunch:0,ballIdx:0,_died:false});
   spawnRow(); descend(); spawnRow(); descend(); spawnRow();
   renderHand(); syncTop();
 }
 
 /* ---------- blocks ---------- */
+const REWARD=[1,1,2,2,3,4];
+function tierIndexForHp(hp){ if(hp<=1)return 0; if(hp<=3)return 1; if(hp<=6)return 2; if(hp<=10)return 3; if(hp<=16)return 4; return 5; }
 function newBlock(col,row,hp,type,cw,chh){
   cw=cw||1; chh=chh||1;
   let shape=null, kind=null;
-  if(type==='chip'){ const bag=cw>1?WIDE_BAG:BAG; kind=bag[Math.floor(Math.random()*bag.length)]; shape=makeShape(kind,cw,chh); }
+  if(type==='chip'){ kind=cw>1?'plaque':BAG[Math.floor(Math.random()*BAG.length)]; shape=makeShape(kind,cw,chh); }
   return {col,row,cw,chh,dispRow:row-1.2,hp,maxhp:hp,type:type||'chip',shape,kind,rot:(Math.random()-.5)*0.07,
-          reward:Math.max(1,Math.round(hp*0.4)),squash:0,flash:0,dead:false,boss:false};
+          reward:REWARD[tierIndexForHp(hp)],squash:0,flash:0,dead:false,boss:false};
 }
+function baseHpAt(t){ return 1+Math.round(Math.pow(t,1.3)/2.6); }
 function descend(){ for(const b of G.blocks) b.row++; }
 function bossAlive(){ return G.blocks.some(b=>b.boss&&!b.dead); }
 function spawnRow(mult){
   mult=mult||1;
-  const t=G.turn, baseHp=1+Math.floor(t/2)+Math.floor(Math.max(0,t-20)*0.35);
+  const t=G.turn, baseHp=baseHpAt(t);
   const gap=Math.max(0.05,(0.26-0.0035*t)*Math.pow(0.9,count('candle'))), pickRate=t<20?0.12:0.08;
   let c=0, pick=false;
   while(c<COLS){
@@ -265,7 +356,7 @@ function spawnRow(mult){
     if(t>=5 && room>=3 && wr<0.16) cw=3;
     else if(t>=3 && room>=2 && wr<0.42) cw=2;
     if(c+cw>COLS) cw=room;
-    const hp=Math.max(1,Math.round(baseHp*mult*(0.6+Math.random()*0.9)*(cw>1?cw*0.8:1)));
+    const hp=Math.max(1,Math.round(baseHp*mult*(0.8+Math.random()*0.4)*(cw>1?cw*0.8:1)));
     G.blocks.push(newBlock(c,0,hp,'chip',cw,1)); c+=cw;
   }
 }
@@ -273,9 +364,9 @@ const BOSS_MODS=['wall','miser','magnet','fog'];
 const BOSS_MOD_NAMES={wall:'THE WALL',miser:'THE MISER',magnet:'THE MAGNET',fog:'THE FOG'};
 function spawnBoss(){
   const num=Math.floor(G.turn/12);
-  const hp=70+(num-1)*110, armor=1+num;
+  const hp=baseHpAt(12*num)*10, armor=1+num;
   G.bossMod=BOSS_MODS[Math.floor(Math.random()*BOSS_MODS.length)];
-  const b=newBlock(0,0,hp,'chip',1,1); b.boss=true; b.rowSpan=2; b.armor=armor+(G.bossMod==='wall'?2:0); b.reward=Math.round(hp*1.1); b.maxhp=hp;
+  const b=newBlock(0,0,hp,'chip',1,1); b.boss=true; b.rowSpan=2; b.armor=armor+(G.bossMod==='wall'?2:0); b.reward=Math.round(hp*0.2); b.maxhp=hp;
   G.blocks.push(b); sBoss(); G.shake=14; floatText(W/2,playTop+cellH,'BOSS','#e8452e');
   floatText(W/2,playTop+cellH*1.8,BOSS_MOD_NAMES[G.bossMod],'#f2c14e');
 }
@@ -297,21 +388,32 @@ function bossGeom(b){ const hw=W*0.47, hh=b.rowSpan*cellH*0.44, cx=W/2, cy=playT
 /* ---------- flow ---------- */
 function fire(){
   if(G.screen!=='play'||!G.dir||G.balls.length||G.queue.length)return;
-  const hr=count('highroller'); if(hr>0){ G.coins=Math.max(0,G.coins-4*hr); syncTop(); }
+  const hr=count('highroller'); if(hr>0){ G.coins=Math.max(0,G.coins-6*hr); syncTop(); }
   const n=ballCount(); G.queue=[]; for(let i=0;i<n;i++)G.queue.push(1);
-  G.fireTimer=0; G.firstReturnX=null; G.destroyedThisTurn=0; G.timeScale=1; G.tollThisLaunch=0; sLaunch();
+  G.fireTimer=0; G.firstReturnX=null; G.destroyedThisTurn=0; G.timeScale=1; G.tollThisLaunch=0; G.ballIdx=0; sLaunch();
 }
+function ballIndex(ball){ return ball.idx||0; }
+function isFirstBall(ball){ return ballIndex(ball)===0; }
+function isLastBall(ball){ return !!ball.anchor; }
 function spawnBall(anchor){ let dmg=ballDmg();
   if(anchor && count('anchor')>0){ dmg*=(1+count('anchor')); jokerProc('anchor'); }
-  G.balls.push({x:G.launchX,y:launchY,vx:G.dir.x*SPEED,vy:G.dir.y*SPEED,r:ballR,dmg,ht:0,anchor:!!anchor}); }
+  const idx=G.ballIdx||0; G.ballIdx=idx+1;
+  const tb=count('timebomb'); let skipWall=false;
+  if(tb>0 && idx%5===4){ dmg+=5*tb; skipWall=true; jokerProc('timebomb'); }
+  G.balls.push({x:G.launchX,y:launchY,vx:G.dir.x*SPEED,vy:G.dir.y*SPEED,r:ballR,dmg,ht:0,anchor:!!anchor,idx,_skipWall:skipWall}); }
 function endTurn(){
-  const ic=count('interest'); if(ic>0){ const g=Math.min(8,Math.floor(G.coins/5)*ic); if(g>0){addCoins(g,W-40,40,true); jokerProc('interest');} }
+  const ic=count('interest'); if(ic>0){ const g=Math.min(8,Math.floor(G.coins/8)*ic); if(g>0){addCoins(g,W-40,40,true); jokerProc('interest');} }
   const pig=count('piggy'); if(pig>0){ addCoins(2*pig,W-40,60,true); jokerProc('piggy'); }
   const ls=count('loanshark'); if(ls>0){ G.coins=Math.max(0,G.coins-2*ls); jokerProc('loanshark'); }
+  const st=count('stash'); if(st>0){ addCoins(G.jokers.length*st,W-40,80,true); jokerProc('stash'); }
+  const jx=count('jinx'); if(jx>0){ const bad=G.jokers.filter(j=>CARDS[j].bad).length; if(bad>0){addCoins(bad*jx,W-40,100,true); jokerProc('jinx');} }
+  const dd=count('doubledown'); if(dd>0 && G.jokers.length>=5){ addCoins(3*dd,W-40,120,true); jokerProc('doubledown'); }
+  const spk=count('stockpile'); if(spk>0){ const g2=Math.min(5,Math.floor(G.coins/10))*spk; if(g2>0){addCoins(g2,W-40,140,true); jokerProc('stockpile');} }
   G.turn++; descend();
   if(G.turn%12===0) spawnBoss();
   else if(!bossAlive()) spawnRow();
   else if(G.turn%2===0) spawnRow(0.5);
+  checkSupport();
   if(G.bossMod==='magnet' && bossAlive()) G.launchX=W/2;
   syncTop();
   if(G.turn%4===1 && G.turn>1) openShop();
@@ -334,6 +436,8 @@ function shardBurst(x,y,face,spot,n){ for(let i=0;i<n;i++){ const a=Math.random(
     rot:Math.random()*6.28,spin:(Math.random()-.5)*10,c:Math.random()<0.6?face:spot,kind:'shard'}); } }
 function ringBurst(x,y,c){ G.particles.push({x,y,life:1,rad:cellW*0.08,maxr:cellW*1.5,c,kind:'ring'}); }
 function floatText(x,y,t,c){ G.floats.push({x,y,txt:t,life:1,c:c||'#fff'}); }
+let lastCritFx=0;
+function critFlash(x,y){ const now=performance.now(); if(now-lastCritFx<200)return; lastCritFx=now; floatText(x,y,'CRIT','#f2c14e'); }
 
 function chainReaction(origin,copies){
   const queue=[origin];
@@ -348,20 +452,75 @@ function chainReaction(origin,copies){
     }
   }
 }
-function breakBlock(b,ball){
+function checkSupport(){
+  const chips=G.blocks.filter(b=>!b.dead&&b.type==='chip'&&!b.boss);
+  if(!chips.length)return false;
+  const boss=G.blocks.find(b=>b.boss&&!b.dead);
+  const bossRows=new Set();
+  if(boss){ bossRows.add(boss.row-1); bossRows.add(boss.row+(boss.rowSpan||1)); }
+  const anchored=new Set(), queue=[];
+  for(const b of chips) if(b.row===0||bossRows.has(b.row)){ anchored.add(b); queue.push(b); }
+  while(queue.length){
+    const cur=queue.shift();
+    for(const ob of chips){
+      if(anchored.has(ob))continue;
+      const sameRow=cur.row===ob.row, adjRow=Math.abs(cur.row-ob.row)===1;
+      const touch=sameRow?(cur.col+cur.cw===ob.col||ob.col+ob.cw===cur.col)
+        :(adjRow&&Math.max(cur.col,ob.col)<Math.min(cur.col+cur.cw,ob.col+ob.cw));
+      if(touch){ anchored.add(ob); queue.push(ob); }
+    }
+  }
+  let any=false;
+  for(const b of chips) if(!anchored.has(b)){ detachChip(b); any=true; }
+  if(any) sFall();
+  return any;
+}
+function detachChip(b){
   b.dead=true;
+  let c=Math.round(b.reward*coinMult());
+  const dm=count('demolition'); if(dm>0){ c+=dm; jokerProc('demolition'); }
+  if(count('riser')>0){ c=0; jokerProc('riser'); }
+  addCoins(c,bx(b),by(b),true); floatText(bx(b),by(b)-cellH*0.3,'+'+c,'#f2c14e');
+  const av=count('avalanche'); if(av>0){ G.jstate.avalanche=Math.min(10,(G.jstate.avalanche||0)+1*av); jokerProc('avalanche'); }
+  if(count('icebreaker')>0){ splashHit(b,1*count('icebreaker')); jokerProc('icebreaker'); }
+  if(count('blastcap')>0){ splashHit(b,2*count('blastcap')); jokerProc('blastcap'); }
+  G.destroyedThisTurn++;
+  G.stats.broken=(G.stats.broken||0)+1;
+  G.particles.push({kind:'faller',x:bx(b),y:by(b),vy:40+Math.random()*20,vr:(Math.random()-.5)*6,
+    rot:b.rot,sKind:b.kind,cw:b.cw,chh:b.chh,hp:b.hp,life:1});
+}
+function breakBlock(b,ball){
+  const bRow=b.row;
+  b.dead=true; G._died=true;
   if(b.boss){ burst(W/2,bossGeom(b).cy,'#e8452e',40); G.shake=16; }
   else{ const t=tierOf(b); shardBurst(bx(b),by(b),t.face[0],t.spot,14); ringBurst(bx(b),by(b),t.spot); }
   sPop(); if(navigator.vibrate)navigator.vibrate(b.boss?40:12);
   let c=Math.round(b.reward*coinMult());
   if(!b.boss){
+    const ti=tierIndexForHp(b.maxhp||b.reward), mar=Math.max(bRow,maxActiveRow());
     if(count('hive')>0 && b.kind==='hex'){ c*=Math.pow(2,count('hive')); jokerProc('hive'); }
     if(count('blockhead')>0 && b.kind==='square'){ c+=4*count('blockhead'); jokerProc('blockhead'); }
     if(count('firstblood')>0 && G.destroyedThisTurn===0){ c*=2; jokerProc('firstblood'); }
+    if(count('lowroller')>0){ if(ti<=1)c*=3; if(ti>=5)c=0; jokerProc('lowroller'); }
+    if(count('gem')>0 && ti>=4){ c+=1*count('gem'); jokerProc('gem'); }
+    if(count('pebble')>0 && ti===0){ c+=1*count('pebble'); jokerProc('pebble'); }
+    if(count('nightowl')>0 && ti>=5){ c*=Math.pow(2,count('nightowl')); jokerProc('nightowl'); }
+    if(count('snipe')>0 && bRow===mar){ c+=2*count('snipe'); jokerProc('snipe'); }
+    if(count('clutch')>0 && bRow===mar){ c*=Math.pow(2,count('clutch')); jokerProc('clutch'); }
+    if(count('undertow')>0 && bRow===mar){ splashHit(b,2*count('undertow')); jokerProc('undertow'); }
+    if(count('corner')>0 && (b.col===0||b.col===COLS-1)){ c+=1*count('corner'); jokerProc('corner'); }
+    if(count('lookout')>0 && b.col===Math.floor(COLS/2)){ c+=1*count('lookout'); jokerProc('lookout'); }
+    if(count('tripwire')>0 && bRow===0){ c+=1*count('tripwire'); jokerProc('tripwire'); }
+    if(count('streak')>0 && G.destroyedThisTurn===2){ c+=3*count('streak'); jokerProc('streak'); }
+    if(count('sentry')>0 && ball && bRow>=Math.floor(rowsFit*2/3)){ ball.dmg+=1*count('sentry'); jokerProc('sentry'); }
+    if(b._crit && count('hotstreak')>0){ c+=2*count('hotstreak'); jokerProc('hotstreak'); }
+    if(count('coinflip')>0){ c=Math.random()<0.5?c*2:0; jokerProc('coinflip'); }
   }
   if(G.destroyedThisTurn>0){ c+=count('combo'); if(count('combo')>0)jokerProc('combo'); }
   for(let i=0;i<count('lucky');i++) if(Math.random()<0.25){ c+=2; jokerProc('lucky'); }
   const ok=count('overkill'); if(ok>0&&ball){ const bonus=Math.max(0,(b._hitDamage||0)-(b._hpBefore||0))*ok; c+=bonus; if(bonus>0)jokerProc('overkill'); }
+  if(count('jackpot')>0 && Math.random()<0.01*count('jackpot')){ c*=50; jokerProc('jackpot'); }
+  if(count('hallofmirrors')>0){ const other=rightmostOther('hallofmirrors'); const rb=replayBonus(other,b,ball); if(rb){ c+=rb; jokerProc('hallofmirrors'); } }
   G.destroyedThisTurn++;
   G.stats.broken=(G.stats.broken||0)+1;
   const px=b.boss?W/2:bx(b), py=b.boss?bossGeom(b).cy:by(b);
@@ -400,7 +559,8 @@ function hitBlock(ball,b){
       else if(mn===ot){n=[0,-1];ball.y=g.cy-g.hh-ball.r;}else{n=[0,1];ball.y=g.cy+g.hh+ball.r;} }
     else{ const d=Math.sqrt(d2); n=[dx/d,dy/d]; ball.x=nx+n[0]*ball.r; ball.y=ny+n[1]*ball.r; }
     const dot=ball.vx*n[0]+ball.vy*n[1]; ball.vx-=2*dot*n[0]; ball.vy-=2*dot*n[1];
-    b._hpBefore=b.hp; const eff=Math.max(1,ball.dmg-Math.max(0,(b.armor||0)-2*count('skeleton')));
+    let bdmg=ball.dmg; if(count('hardhat')>0){ bdmg+=2*count('hardhat'); jokerProc('hardhat'); }
+    b._hpBefore=b.hp; const eff=Math.max(1,bdmg-Math.max(0,(b.armor||0)-2*count('skeleton')));
     if(count('skeleton')>0)jokerProc('skeleton');
     b._hitDamage=eff; b.hp-=eff; b.squash=0.5; b.flash=1;
     sHit(G.destroyedThisTurn); if(b.hp<=0)breakBlock(b,ball); return true;
@@ -409,11 +569,35 @@ function hitBlock(ball,b){
   if((ball.x-cx0)**2+(ball.y-cy0)**2>R*R) return false;
   const h=polyHit(ball.x-cx0,ball.y-cy0,ball.r,b.shape,cellW); if(!h)return false;
   ball.x=cx0+h.ux*cellW; ball.y=cy0+h.uy*cellW;
+  const preVx=ball.vx, preVy=ball.vy;
   const dot=ball.vx*h.nx+ball.vy*h.ny; ball.vx-=2*dot*h.nx; ball.vy-=2*dot*h.ny;
   let dmg=ball.dmg;
+  if(ball._hot){ dmg+=ball._hot; ball._hot=0; jokerProc('magnet'); }
+  if(isFirstBall(ball)) dmg+=1*count('leadball');
+  if(ballIndex(ball)%3===2) dmg+=1*count('windup');
+  if(ballIndex(ball)>=4) dmg+=1*count('stopwatch');
+  if(ballIndex(ball)>=6) dmg+=3*count('overtime');
+  if(isLastBall(ball)){ dmg+=2*count('lastcall'); dmg+=3*count('lastlaugh'); }
   if(count('edgelord')>0 && (b.kind==='triUp'||b.kind==='triDn')){ dmg+=2*count('edgelord'); jokerProc('edgelord'); }
+  if(count('deadcenter')>0 && b.col===Math.floor(COLS/2)){ dmg*=Math.pow(2,count('deadcenter')); jokerProc('deadcenter'); }
+  if(count('hardhat')>0){ dmg=Math.max(0,dmg-1*count('hardhat')); jokerProc('hardhat'); }
+  const bruise=count('bruiser')>0 && tierIndexForHp(b.maxhp||b.reward)===0;
+  const cc=critChance(), crit=cc>0 && Math.random()<cc;
+  if(crit){ dmg*=2; critFlash(cx0,cy0); jokerProc('headhunter'); }
+  else if(count('warhead')>0){ dmg=Math.max(1,dmg-1*count('warhead')); jokerProc('warhead'); }
   b._hpBefore=b.hp; b._hitDamage=dmg; b.hp-=dmg; b.squash=1; b.flash=1; sHit(G.destroyedThisTurn);
-  if(b.hp<=0)breakBlock(b,ball); return true;
+  if(crit && count('headhunter')>0 && b.hp>0 && b.hp<=3) b.hp=0;
+  if(bruise){ b.hp=0; jokerProc('bruiser'); }
+  b._crit=crit;
+  const sp=splashDmg(); if(sp>0) splashHit(b,sp);
+  if(b.hp<=0){ breakBlock(b,ball); ball._hot=count('magnet');
+    if(count('riptide')>0){ rowSplashHit(b,1*count('riptide')); jokerProc('riptide'); }
+    const pc=pierceChance(); if(pc>0 && Math.random()<pc){ ball.vx=preVx; ball.vy=preVy;
+      if(count('phalanx')>0) ball.dmg+=1*count('phalanx');
+      if(count('boomerang')>0){ ball.dmg=Math.max(1,ball.dmg-1*count('boomerang')); jokerProc('boomerang'); }
+    }
+  } else if(count('lastlaugh')>0){ G.coins=Math.max(0,G.coins-1*count('lastlaugh')); jokerProc('lastlaugh'); }
+  return true;
 }
 function moveBall(ball,dt){
   const dist=Math.hypot(ball.vx,ball.vy)*dt, steps=Math.max(1,Math.ceil(dist/(ball.r*0.6))), sdt=dt/steps;
@@ -428,9 +612,10 @@ function moveBall(ball,dt){
   ball.ht=(Math.abs(ball.vy)<SPEED*0.12)?ball.ht+dt:0;
   if(ball.ht>1.4){ ball.vy+=(ball.vy>=0?1:-1)*SPEED*2*dt; if(Math.abs(ball.vy)<SPEED*0.12)ball.vy=SPEED*0.3; }
 }
-function wallHit(ball,top){ const bk=count('bank'); if(bk>0){ ball._bank=ball._bank||0;
+function wallHit(ball,top){ if(ball._skipWall)return;
+  const bk=count('bank'); if(bk>0 && !top){ ball._bank=ball._bank||0;
   const cap=3*bk, add=Math.min(bk,cap-ball._bank); if(add>0){ ball.dmg+=add; ball._bank+=add; jokerProc('bank'); } }
-  const tb=count('toll'); if(tb>0 && G.tollThisLaunch<8){ const add=Math.min(tb,8-G.tollThisLaunch);
+  const tb=count('toll'); if(tb>0 && G.tollThisLaunch<4){ const add=Math.min(tb,4-G.tollThisLaunch);
     if(add>0){ G.tollThisLaunch+=add; addCoins(add,ball.x,ball.y,true); jokerProc('toll'); } }
   if(top && count('kite')>0 && !ball._kited){ ball._kited=true; ball.dmg+=2; jokerProc('kite'); }
 }
@@ -442,6 +627,7 @@ function update(dt){
   for(const b of G.blocks){ b.dispRow+=(b.row-b.dispRow)*Math.min(1,dt*9);
     if(b.squash>0)b.squash=Math.max(0,b.squash-dt*6); if(b.flash>0)b.flash=Math.max(0,b.flash-dt*7); }
   G.blocks=G.blocks.filter(b=>!b.dead);
+  if(G._died){ G._died=false; let guard=0; while(checkSupport()&&guard++<40){} }
   if(G.screen==='play'){
     const sdt=dt*G.timeScale;
     if(G.queue.length){ G.fireTimer-=sdt; if(G.fireTimer<=0){ spawnBall(G.queue.length===1); G.queue.shift(); G.fireTimer=0.055; } }
@@ -454,6 +640,8 @@ function update(dt){
   }
   for(const p of G.particles){
     if(p.kind==='ring'){ p.rad+=(p.maxr-p.rad)*dt*4; p.life-=dt*2.2; continue; }
+    if(p.kind==='faller'){ p.vy+=900*dt; p.y+=p.vy*dt; p.rot+=p.vr*dt;
+      if(p.y>H+cellW){ p.life=0; shardBurst(p.x,H+cellW,'#f2c14e','#fff',5); } continue; }
     p.vy+=380*dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.life-=dt*1.6;
     if(p.kind==='shard') p.rot+=p.spin*dt;
   }
@@ -469,6 +657,20 @@ function rrOn(c,x,y,w,h,r){ c.beginPath(); c.moveTo(x+r,y); c.arcTo(x+w,y,x+w,y+
 function tracePolyOn(c,verts,scale,oy){ c.beginPath(); c.moveTo(verts[0][0]*scale,verts[0][1]*scale+oy);
   for(let i=1;i<verts.length;i++)c.lineTo(verts[i][0]*scale,verts[i][1]*scale+oy); c.closePath(); }
 function tracePoly(verts,scale,oy){ tracePolyOn(ctx,verts,scale,oy); }
+function tracePolyRoundedOn(c,verts,scale,oy,rad){
+  const n=verts.length, pt=i=>{ const p=verts[i]; return [p[0]*scale,p[1]*scale+oy]; };
+  c.beginPath();
+  for(let i=0;i<n;i++){
+    const prev=pt((i-1+n)%n), cur=pt(i), next=pt((i+1)%n);
+    const dx1=cur[0]-prev[0],dy1=cur[1]-prev[1],L1=Math.hypot(dx1,dy1)||1;
+    const dx2=next[0]-cur[0],dy2=next[1]-cur[1],L2=Math.hypot(dx2,dy2)||1;
+    const r=Math.min(rad,L1*0.5,L2*0.5);
+    const p1x=cur[0]-dx1/L1*r, p1y=cur[1]-dy1/L1*r, p2x=cur[0]+dx2/L2*r, p2y=cur[1]+dy2/L2*r;
+    if(i===0)c.moveTo(p1x,p1y); else c.lineTo(p1x,p1y);
+    c.quadraticCurveTo(cur[0],cur[1],p2x,p2y);
+  }
+  c.closePath();
+}
 
 /* ---------- sprite caches (built lazily, only from the draw path) ---------- */
 let chipCache=new Map(), bossSpriteCache=new Map(), launcherSprite=null, ballSprite=null, feltBg=null;
@@ -478,23 +680,48 @@ function buildChipSprite(kind,cw,chh,t){
   const hw=mx*cellW, hh=my*cellW, pad=cellW*0.18, w=(hw+pad)*2, h=(hh+pad)*2;
   const cnv=document.createElement('canvas'); cnv.width=Math.ceil(w*dpr); cnv.height=Math.ceil(h*dpr);
   const c=cnv.getContext('2d'); c.setTransform(dpr,0,0,dpr,0,0); c.translate(w/2,h/2);
+  if(kind==='plaque'){
+    const rimR=cellW*0.16;
+    c.save(); c.shadowColor='rgba(0,0,0,.45)'; c.shadowBlur=cellW*0.12; c.fillStyle='rgba(0,0,0,.35)';
+    rrOn(c,-hw,-hh+cellW*0.06,hw*2,hh*2,rimR); c.fill(); c.restore();
+    c.fillStyle=t.rim; rrOn(c,-hw,-hh,hw*2,hh*2,rimR); c.fill();
+    const faceOy=-cellW*0.03, fw=hw*0.86, fh=hh*0.86, faceR=cellW*0.13;
+    const fg=c.createLinearGradient(0,-fh,0,fh); fg.addColorStop(0,t.face[0]); fg.addColorStop(1,t.face[1]);
+    c.fillStyle=fg; rrOn(c,-fw,-fh+faceOy,fw*2,fh*2,faceR); c.fill();
+    c.strokeStyle='rgba(255,255,255,.35)'; c.lineWidth=Math.max(1,cellW*0.03); rrOn(c,-fw,-fh+faceOy,fw*2,fh*2,faceR); c.stroke();
+    c.save(); c.strokeStyle=t.ring; c.lineWidth=Math.max(1,cellW*0.02);
+    const iw=fw*0.82, ih=fh*0.82; rrOn(c,-iw,-ih+faceOy,iw*2,ih*2,faceR*0.8); c.stroke(); c.restore();
+    const dotR=cellW*0.055, dotIn=0.78;
+    c.fillStyle=t.spot;
+    for(const sx of [-1,1]) for(const sy of [-1,1]){ c.beginPath(); c.arc(sx*hw*dotIn,sy*hh*dotIn+faceOy,dotR,0,7); c.fill(); }
+    const rad=c.createRadialGradient(-hw*0.4,-hh*0.5,1,-hw*0.4,-hh*0.5,Math.max(hw,hh)*1.1);
+    rad.addColorStop(0,'rgba(255,255,255,.22)'); rad.addColorStop(1,'rgba(255,255,255,0)');
+    c.fillStyle=rad; rrOn(c,-hw,-hh,hw*2,hh*2,rimR); c.fill();
+    return {canvas:cnv,w,h};
+  }
+  const cornerR=cellW*0.07;
   c.save(); c.shadowColor='rgba(0,0,0,.45)'; c.shadowBlur=cellW*0.12; c.fillStyle='rgba(0,0,0,.35)';
-  tracePolyOn(c,V,cellW,cellW*0.06); c.fill(); c.restore();
-  c.fillStyle=t.rim; tracePolyOn(c,V,cellW,0); c.fill();
-  const nSpots=(kind==='hex'||kind==='oct')?8:6, R=Math.max(hw,hh);
+  tracePolyRoundedOn(c,V,cellW,cellW*0.06,cornerR); c.fill(); c.restore();
+  c.fillStyle=t.rim; tracePolyRoundedOn(c,V,cellW,0,cornerR); c.fill();
   c.save(); tracePolyOn(c,V,cellW,0); c.clip();
-  for(let i=0;i<nSpots;i++){ c.save(); c.rotate(i/nSpots*6.2832); c.fillStyle=t.spot;
-    c.fillRect(-R*1.3,-R*0.055,R*2.6,R*0.11); c.restore(); }
+  for(const e of shape.edges){
+    const mx=e.ax+e.ex/2, my=e.ay+e.ey/2, ang=Math.atan2(e.ey,e.ex);
+    const cx2=mx*0.9*cellW, cy2=my*0.9*cellW;
+    const len=Math.max(cellW*0.08,Math.hypot(mx,my)*0.2*cellW), thick=cellW*0.16;
+    c.save(); c.translate(cx2,cy2); c.rotate(ang); c.fillStyle=t.spot; c.fillRect(-thick/2,-len/2,thick,len); c.restore();
+  }
   c.restore();
   const faceOy=-cellW*0.03, fg=c.createLinearGradient(0,-hh*0.8,0,hh*0.8);
   fg.addColorStop(0,t.face[0]); fg.addColorStop(1,t.face[1]);
-  c.fillStyle=fg; tracePolyOn(c,V,cellW*0.8,faceOy); c.fill();
-  c.strokeStyle='rgba(255,255,255,.35)'; c.lineWidth=Math.max(1,cellW*0.03); tracePolyOn(c,V,cellW*0.8,faceOy); c.stroke();
-  c.save(); c.strokeStyle=t.ring; c.lineWidth=Math.max(1,cellW*0.025); c.setLineDash([cellW*0.06,cellW*0.05]);
-  tracePolyOn(c,V,cellW*0.6,faceOy); c.stroke(); c.restore();
+  c.fillStyle=fg; tracePolyRoundedOn(c,V,cellW*0.8,faceOy,cornerR*0.8); c.fill();
+  c.strokeStyle='rgba(255,255,255,.35)'; c.lineWidth=Math.max(1,cellW*0.03); tracePolyRoundedOn(c,V,cellW*0.8,faceOy,cornerR*0.8); c.stroke();
+  const isTri=kind==='triUp'||kind==='triDn';
+  c.save(); c.strokeStyle=t.ring; c.lineWidth=Math.max(1,cellW*(isTri?0.03:0.025));
+  if(!isTri) c.setLineDash([cellW*0.06,cellW*0.05]);
+  tracePolyRoundedOn(c,V,cellW*0.58,faceOy,cornerR*0.6); c.stroke(); c.restore();
   const rad=c.createRadialGradient(-hw*0.4,-hh*0.5,1,-hw*0.4,-hh*0.5,Math.max(hw,hh)*1.1);
   rad.addColorStop(0,'rgba(255,255,255,.22)'); rad.addColorStop(1,'rgba(255,255,255,0)');
-  c.fillStyle=rad; tracePolyOn(c,V,cellW,0); c.fill();
+  c.fillStyle=rad; tracePolyRoundedOn(c,V,cellW,0,cornerR); c.fill();
   return {canvas:cnv,w,h};
 }
 function getChipSprite(b){ const t=tierOf(b), key=b.kind+'|'+b.cw+'x'+b.chh+'|'+t.name;
@@ -586,6 +813,13 @@ function draw(){
     ctx.globalAlpha=Math.max(0,p.life);
     if(p.kind==='ring'){ ctx.strokeStyle=p.c; ctx.lineWidth=Math.max(1,cellW*0.045); ctx.beginPath(); ctx.arc(p.x,p.y,p.rad,0,7); ctx.stroke(); continue; }
     if(p.kind==='shard'){ ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot); ctx.fillStyle=p.c; rr(-p.w/2,-p.h/2,p.w,p.h,1.4); ctx.fill(); ctx.restore(); continue; }
+    if(p.kind==='faller'){
+      try{ const sprite=getChipSprite({kind:p.sKind,cw:p.cw,chh:p.chh,hp:p.hp});
+        ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot);
+        ctx.drawImage(sprite.canvas,-sprite.w/2,-sprite.h/2,sprite.w,sprite.h); ctx.restore();
+      }catch(e){}
+      continue;
+    }
     ctx.fillStyle=p.c; ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,7); ctx.fill();
   }
   ctx.globalAlpha=1; ctx.textAlign='center';
@@ -697,21 +931,29 @@ function punchCoins(){ const el=document.getElementById('coins'), wrap=el&&el.pa
 function syncTop(){ document.getElementById('coins').textContent=G.coins; document.getElementById('round').textContent=G.turn; document.getElementById('balls').textContent=ballCount(); }
 
 const shopOv=document.getElementById('shopOv');
-const PRICE={common:4,uncommon:6,rare:9};
-const RARITY_IDS={common:[],uncommon:[],rare:[]};
+const PRICE={common:4,uncommon:6,rare:9,legendary:25};
+const RARITY_IDS={common:[],uncommon:[],rare:[],legendary:[]};
 for(const id of CARD_IDS) RARITY_IDS[CARDS[id].rar].push(id);
-function cardPrice(id){ return Math.max(2, PRICE[CARDS[id].rar]+Math.floor(G.shopVisits/2)-2*count('coupon')); }
-function sellValue(id){ return Math.max(2,Math.floor(cardPrice(id)*0.4)); }
-function rerollPrice(){ return Math.max(1, G.rerollCost-2*count('recycler')); }
-function pickRarity(){ const r=Math.random(); return r<0.62?'common':r<0.92?'uncommon':'rare'; }
-function pickOffer(){ const pool=RARITY_IDS[pickRarity()]; return pool[Math.floor(Math.random()*pool.length)]; }
+function cardPrice(id){ const visits=count('pricefreeze')>0?Math.min(G.shopVisits,15):G.shopVisits;
+  return Math.max(2, PRICE[CARDS[id].rar]+visits+1*count('lowballer')-2*count('coupon')); }
+function sellValue(id){ const price=cardPrice(id);
+  return Math.max(2,Math.floor(price*0.4))+1*count('thrifty')+Math.max(1,Math.round(price*0.2))*count('bullmarket'); }
+function ballPackPrice(){ return 10+6*(G.jstate.ballPacks||0); }
+function rerollPrice(){ const base=Math.max(1, G.rerollCost-2*count('recycler')-1*count('lowballer'));
+  let p=count('highstakes')>0?base*2:base; if(count('freebie')>0 && !G.jstate.usedFreeReroll) p=0; return p; }
+function pickRarity(forceMin){ const r=Math.random();
+  let rar=r<0.55?'common':r<0.87?'uncommon':r<0.98?'rare':'legendary';
+  if(forceMin && rar==='common') rar='uncommon'; return rar; }
+function pickOffer(forceMin){ const pool=RARITY_IDS[pickRarity(forceMin)]; return pool[Math.floor(Math.random()*pool.length)]; }
 function buildOffers(){ G.offers=[];
-  for(let i=0;i<3;i++){ let id=pickOffer(); if(G.offers.includes(id))id=pickOffer(); G.offers.push(id); }
+  const hs=count('highstakes')>0, n=3+(count('vault')>0?1:0);
+  for(let i=0;i<n;i++){ let id=pickOffer(hs&&i===0); if(G.offers.includes(id))id=pickOffer(hs&&i===0); G.offers.push(id); }
   renderShop();
 }
 function openShop(){ G.screen='shop'; G.shopVisits++;
   if(count('investor')>0){ G.jstate.inv=(G.jstate.inv||0)+1; jokerProc('investor'); }
-  G.rerollCost=3; buildOffers(); shopOv.classList.add('show'); }
+  G.jstate.usedFreeReroll=false;
+  G.rerollCost=Math.min(11,3+Math.floor(G.shopVisits/2)); buildOffers(); shopOv.classList.add('show'); }
 function renderShop(){
   const el=document.getElementById('shopCards'); el.innerHTML='';
   G.offers.forEach((id,idx)=>{ if(id===null)return; const c=CARDS[id], price=cardPrice(id);
@@ -719,15 +961,28 @@ function renderShop(){
     card.style.setProperty('--rarglow',RAR_COLORS[c.rar]);
     card.innerHTML='<div class="rarpill" style="background:'+RAR_COLORS[c.rar]+'">'+c.rar+'</div><div class="ic">'+c.ic+'</div><div class="nm">'+c.nm+'</div><div class="ds">'+c.ds+'</div><div class="pr">'+price+' \u25CF</div>';
     card.onclick=()=>{ if(G.coins<price||G.jokers.length>=5)return; G.coins-=price; G.jokers.push(id); G.offers[idx]=null; sCoin();
-      if(id==='loanshark'){ addCoins(30,W-40,40,true); jokerProc('loanshark'); }
+      if(id==='loanshark'){ addCoins(18,W-40,40,true); jokerProc('loanshark'); }
+      const rc=count('receipt'); if(rc>0){ G.coins+=rc; jokerProc('receipt'); }
       punchCoins(); renderHand(); renderShop(); };
     el.appendChild(card); });
+  const bpPrice=ballPackPrice();
+  const bp=document.createElement('div'); bp.className='shopcard ballpack'; bp.isBallPack=true;
+  bp.innerHTML='<div class="ic">🎱</div><div class="nm">Ball Pack</div><div class="ds">+1 ball, permanently.</div><div class="pr">'+bpPrice+' ●</div>';
+  bp.onclick=()=>{ const price=ballPackPrice(); if(G.coins<price)return; G.coins-=price;
+    G.jstate.ballPacks=(G.jstate.ballPacks||0)+1; G.bonusBalls=(G.bonusBalls||0)+1; sCoin();
+    punchCoins(); renderShop(); };
+  el.appendChild(bp);
   refreshShop();
 }
 function refreshShop(){
   document.getElementById('shopCoins').textContent=G.coins; document.getElementById('shopSlots').textContent=G.jokers.length+'/5';
   const visibleIds=G.offers.filter(id=>id!=null);
-  [...document.getElementById('shopCards').children].forEach((ch,i)=>{ const price=cardPrice(visibleIds[i]); const ok=G.coins>=price&&G.jokers.length<5; ch.classList.toggle('disabled',!ok); });
+  const cardEls=[...document.getElementById('shopCards').children];
+  let oi=0;
+  for(const ch of cardEls){
+    if(ch.isBallPack){ ch.classList.toggle('disabled',G.coins<ballPackPrice()); continue; }
+    const price=cardPrice(visibleIds[oi]); const ok=G.coins>=price&&G.jokers.length<5; ch.classList.toggle('disabled',!ok); oi++;
+  }
   const rb=document.getElementById('rerollBtn'); rb.textContent='Reroll ('+rerollPrice()+')'; rb.disabled=G.coins<rerollPrice();
   const own=document.getElementById('ownedRow'); own.innerHTML='';
   G.jokers.forEach((id,idx)=>{ const c=CARDS[id]; const o=document.createElement('div'); o.className='owned'+(c.bad?' bad':'');
@@ -738,7 +993,9 @@ function refreshShop(){
         wrap.appendChild(f); setTimeout(()=>{ if(f.remove)f.remove(); },650); }
       G.jokers.splice(idx,1); G.coins+=value; sCoin(); renderHand(); renderShop(); };
     own.appendChild(o); }); }
-document.getElementById('rerollBtn').onclick=()=>{ const p=rerollPrice(); if(G.coins<p)return; G.coins-=p; G.rerollCost+=2; jokerProc('recycler'); buildOffers(); };
+document.getElementById('rerollBtn').onclick=()=>{ const p=rerollPrice(); if(G.coins<p)return; G.coins-=p; G.rerollCost+=2;
+  if(count('freebie')>0 && !G.jstate.usedFreeReroll){ G.jstate.usedFreeReroll=true; jokerProc('freebie'); }
+  jokerProc('recycler'); buildOffers(); };
 document.getElementById('nextBtn').onclick=()=>{ shopOv.classList.remove('show'); G.screen='play'; checkLoss(); };
 
 function gameOver(){ G.screen='over'; sOver(); G.best=Math.max(G.best,G.coins);

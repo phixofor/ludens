@@ -58,16 +58,19 @@ sandbox.globalThis = sandbox;
 
 const instrumented = scriptMatch[1].replace(
   "resize(); renderHand(); requestAnimationFrame(loop);",
-  "globalThis.__game={G,bossAlive,breakBlock,sellValue,refreshShop,reset,CARDS,count,ballCount,ballDmg,coinMult,wallHit,spawnRow,spawnBoss,endTurn,hitBlock,cardPrice,buildOffers,bossGeom};"
+  "globalThis.__game={G,bossAlive,breakBlock,sellValue,refreshShop,renderShop,reset,CARDS,count,ballCount,ballDmg,coinMult,wallHit,spawnRow,spawnBoss,endTurn,hitBlock,cardPrice,buildOffers,bossGeom,checkSupport,critChance,pierceChance,baseHpAt,newBlock,ballPackPrice,rerollPrice,openShop,update,fire,resize,bx,by};"
 );
 assert.notEqual(instrumented, scriptMatch[1], "game script test hook was installed");
 vm.runInNewContext(instrumented, sandbox);
 
 const {
-  G, bossAlive, breakBlock, refreshShop, reset,
+  G, bossAlive, breakBlock, refreshShop, renderShop, reset,
   CARDS, count, ballCount, ballDmg, coinMult, wallHit,
-  spawnRow, spawnBoss, endTurn, hitBlock, cardPrice, buildOffers, bossGeom,
+  spawnRow, spawnBoss, endTurn, hitBlock, cardPrice, buildOffers, bossGeom, checkSupport,
+  critChance, pierceChance, baseHpAt, newBlock, ballPackPrice, rerollPrice, openShop, update, fire, resize, bx, by,
 } = sandbox.__game;
+
+resize();
 
 /* ---------- deterministic Math.random helper ---------- */
 function withRandomSeq(seq, fn) {
@@ -84,6 +87,15 @@ function noGapPattern(cols, hpRoll) {
   const out = [];
   for (let i = 0; i < cols; i++) out.push(0.99, 0.99, 0.99, hpRoll == null ? 0.5 : hpRoll, 0.99, 0.99);
   return out;
+}
+// breakBlock's VFX (shardBurst/burst) also draws from Math.random for cosmetic
+// angle/speed, so a killing hit consumes an unpredictable number of rolls before
+// the pierce/crit check. Pin every roll to the same constant to make the
+// mechanic-relevant roll deterministic regardless of VFX call count.
+function withConstantRandom(v, fn) {
+  const real = Math.random;
+  Math.random = () => v;
+  try { return fn(); } finally { Math.random = real; }
 }
 
 /* ---------- existing baseline assertions ---------- */
@@ -113,10 +125,10 @@ assert.equal(G.shake, 0);
 assert.equal(G.rerollCost, 3);
 assert.equal(G.offers.length, 0);
 
-/* ---------- CARDS integrity: 29 entries, valid rarity ---------- */
+/* ---------- CARDS integrity: 42 entries, valid rarity ---------- */
 const cardIds = Object.keys(CARDS);
-assert.equal(cardIds.length, 29, "roster must have 29 jokers");
-const validRar = new Set(["common", "uncommon", "rare"]);
+assert.equal(cardIds.length, 89, "roster must have 89 jokers");
+const validRar = new Set(["common", "uncommon", "rare", "legendary"]);
 for (const id of cardIds) assert.ok(validRar.has(CARDS[id].rar), `${id} has a valid rarity`);
 
 /* ---------- Bank Shot cap ---------- */
@@ -172,7 +184,7 @@ for (const id of cardIds) assert.ok(validRar.has(CARDS[id].rar), `${id} has a va
   for (const b of G.blocks) {
     assert.equal(b.type, "chip");
     assert.equal(b.cw, 1);
-    assert.equal(b.hp, 25, "baseHp=24 at t=36, mid roll (0.5) -> round(24*1.05)=25");
+    assert.equal(b.hp, 42, "baseHpAt(36)=42, mid roll (0.5) -> round(42*1.0)=42");
   }
 }
 
@@ -188,7 +200,7 @@ for (const id of cardIds) assert.ok(validRar.has(CARDS[id].rar), `${id} has a va
   Object.assign(G, { turn: 24, blocks: [] });
   withRandomSeq([0.3], () => spawnBoss());
   const boss = G.blocks.find(b => b.boss);
-  assert.equal(boss.hp, 180, "boss 2 hp = 70+(2-1)*110");
+  assert.equal(boss.hp, 250, "boss 2 hp = baseHpAt(24)*10 = 25*10");
   assert.equal(G.bossMod, "miser", "roll 0.3 -> BOSS_MODS[1]");
   assert.equal(boss.armor, 3, "non-wall modifier: armor = 1+num, no +2");
 }
@@ -260,6 +272,288 @@ for (const id of cardIds) assert.ok(validRar.has(CARDS[id].rar), `${id} has a va
   assert.equal(ballCount(), 6, "2x Extra Ball: 4 base + 2");
   Object.assign(G, { jokers: ["midas"], jstate: {}, bossMod: null, blocks: [] });
   assert.equal(coinMult(), 1.5, "1x Midas Touch: +50% chips");
+}
+
+/* ---------- checkSupport: structural detach ---------- */
+{
+  Object.assign(G, { coins: 0, jokers: [], particles: [], floats: [], coinfx: [],
+    destroyedThisTurn: 0, stats: { broken: 0 },
+    blocks: [
+      { col: 0, row: 0, cw: 1, chh: 1, type: 'chip', boss: false, dead: false, hp: 3, reward: 2, rot: 0 },
+      { col: 3, row: 2, cw: 1, chh: 1, type: 'chip', boss: false, dead: false, hp: 3, reward: 2, rot: 0 },
+    ] });
+  const detached = checkSupport();
+  assert.equal(detached, true, "an isolated chip with no anchor chain detaches");
+  assert.equal(G.blocks[0].dead, false, "row-0 anchor chip stays");
+  assert.equal(G.blocks[1].dead, true, "unsupported chip is marked dead");
+  assert.equal(G.coins, 2, "detached chip pays its tier reward");
+  assert.equal(G.particles.length, 1, "a faller particle is spawned");
+  assert.equal(G.particles[0].kind, "faller");
+}
+{
+  Object.assign(G, { coins: 0, jokers: [], particles: [], floats: [], coinfx: [],
+    destroyedThisTurn: 0, stats: { broken: 0 },
+    blocks: [
+      { col: 0, row: 0, cw: 1, chh: 1, type: 'chip', boss: false, dead: false, hp: 3, reward: 2, rot: 0 },
+      { col: 0, row: 1, cw: 1, chh: 1, type: 'chip', boss: false, dead: false, hp: 3, reward: 2, rot: 0 },
+    ] });
+  const detached = checkSupport();
+  assert.equal(detached, false, "a chip chained to a row-0 anchor stays supported");
+  assert.equal(G.blocks[1].dead, false);
+}
+{
+  Object.assign(G, { coins: 0, jokers: [], particles: [], floats: [], coinfx: [],
+    destroyedThisTurn: 0, stats: { broken: 0 },
+    blocks: [
+      { boss: true, dead: false, row: 3, rowSpan: 2, hp: 50, armor: 1, dispRow: 3 },
+      { col: 2, row: 5, cw: 1, chh: 1, type: 'chip', boss: false, dead: false, hp: 3, reward: 2, rot: 0 },
+    ] });
+  const detached = checkSupport();
+  assert.equal(detached, false, "a live boss anchors chips row-adjacent to it");
+  assert.equal(G.blocks[1].dead, false);
+}
+
+/* ---------- reward table by tier ---------- */
+{
+  const hps = [1, 3, 6, 10, 16, 40], expectedReward = [1, 1, 2, 2, 3, 4];
+  hps.forEach((hp, i) => {
+    const b = newBlock(0, 0, hp, "chip", 1, 1);
+    assert.equal(b.reward, expectedReward[i], `hp=${hp} pays tier reward ${expectedReward[i]}`);
+  });
+}
+
+/* ---------- baseHp curve spot values ---------- */
+{
+  const spots = { 1: 1, 2: 2, 3: 3, 4: 3, 17: 16, 40: 48 };
+  for (const [t, expected] of Object.entries(spots)) {
+    assert.equal(baseHpAt(Number(t)), expected, `baseHpAt(${t}) === ${expected}`);
+  }
+}
+
+/* ---------- boss hp = baseHpAt(12*num)*10 across multiple boss numbers ---------- */
+{
+  Object.assign(G, { turn: 12, blocks: [] });
+  withRandomSeq([0.1], () => spawnBoss());
+  assert.equal(G.blocks.find(b => b.boss).hp, 110, "boss 1 hp = baseHpAt(12)*10");
+}
+{
+  Object.assign(G, { turn: 48, blocks: [] });
+  withRandomSeq([0.1], () => spawnBoss());
+  assert.equal(G.blocks.find(b => b.boss).hp, 600, "boss 4 hp = baseHpAt(48)*10");
+}
+
+/* ---------- Bank Shot: ceiling hits never trigger the bonus ---------- */
+{
+  Object.assign(G, { jokers: ["bank"] });
+  const ball = { dmg: 1, _bank: 0, x: 0, y: 0 };
+  for (let i = 0; i < 10; i++) wallHit(ball, true);
+  assert.equal(ball.dmg, 1, "10 ceiling-only hits add 0 bank-shot damage");
+}
+
+/* ---------- Toll Booth caps at 4 per launch regardless of copies ---------- */
+{
+  Object.assign(G, { jokers: ["toll"], tollThisLaunch: 0, coins: 0, coinfx: [] });
+  const ball = { x: 0, y: 0 };
+  for (let i = 0; i < 10; i++) wallHit(ball);
+  assert.equal(G.tollThisLaunch, 4, "toll booth caps at 4 wall bounces per launch");
+  assert.equal(G.coins, 4, "1 copy of toll: 1 chip per counted bounce, capped at 4");
+}
+{
+  Object.assign(G, { jokers: ["toll", "toll"], tollThisLaunch: 0, coins: 0, coinfx: [] });
+  const ball = { x: 0, y: 0 };
+  wallHit(ball); wallHit(ball); wallHit(ball);
+  assert.equal(G.tollThisLaunch, 4, "2 copies still cap the counter at 4");
+  assert.equal(G.coins, 4, "2 copies still cap total chips at 4 (first bounce pays 2, second pays 2, third pays 0)");
+}
+
+/* ---------- pricing: legendary tier + visit growth + coupon floor ---------- */
+{
+  Object.assign(G, { shopVisits: 0, jokers: [] });
+  assert.equal(cardPrice("wildcard"), 25, "legendary base price is 25");
+  Object.assign(G, { shopVisits: 5, jokers: [] });
+  assert.equal(cardPrice("wildcard"), 30, "price grows +1 per shop visit");
+  Object.assign(G, { shopVisits: 5, jokers: ["coupon", "coupon", "coupon", "coupon", "coupon", "coupon", "coupon", "coupon", "coupon", "coupon", "coupon", "coupon", "coupon", "coupon"] });
+  assert.equal(cardPrice("heavy"), 2, "coupon discount still floors at 2 even with many copies");
+}
+
+/* ---------- reroll base persists (a function of cumulative shopVisits) ---------- */
+{
+  Object.assign(G, { shopVisits: 0, coins: 10000, jokers: [], offers: [], jstate: {} });
+  openShop();
+  assert.equal(G.shopVisits, 1);
+  assert.equal(G.rerollCost, 3, "visit 1: min(11,3+floor(1/2))=3");
+  openShop();
+  assert.equal(G.shopVisits, 2);
+  assert.equal(G.rerollCost, 4, "visit 2: 3+floor(2/2)=4");
+  for (let i = 0; i < 8; i++) openShop();
+  assert.equal(G.shopVisits, 10);
+  assert.equal(G.rerollCost, 8, "visit 10: 3+floor(10/2)=8, persists across visits rather than resetting to 3");
+  assert.equal(rerollPrice(), 8, "no recycler/highstakes/freebie: reroll price equals the base");
+}
+
+/* ---------- Ball Pack: price escalation + bonusBalls effect ---------- */
+{
+  Object.assign(G, { jstate: {} });
+  assert.equal(ballPackPrice(), 10, "first ball pack costs 10");
+  Object.assign(G, { jstate: { ballPacks: 1 } });
+  assert.equal(ballPackPrice(), 16, "second ball pack costs 16");
+  Object.assign(G, { jstate: { ballPacks: 2 } });
+  assert.equal(ballPackPrice(), 22, "third ball pack costs 22");
+
+  Object.assign(G, { jokers: [], bonusBalls: 0 });
+  const baseBalls = ballCount();
+  Object.assign(G, { coins: 20, offers: [], jstate: {}, bonusBalls: 0 });
+  renderShop();
+  const shopCardsEl = getElement("shopCards");
+  const bpCard = shopCardsEl.children[shopCardsEl.children.length - 1];
+  bpCard.onclick();
+  assert.equal(G.coins, 10, "buying the first ball pack costs 10 chips");
+  assert.equal(G.jstate.ballPacks, 1);
+  assert.equal(G.bonusBalls, 1);
+  assert.equal(ballCount(), baseBalls + 1, "bonusBalls grants +1 ball permanently");
+  bpCard.onclick();
+  assert.equal(G.coins, 10, "insufficient chips (price now 16): purchase is a no-op");
+  assert.equal(G.jstate.ballPacks, 1, "no second purchase happened");
+  Object.assign(G, { coins: 16 });
+  bpCard.onclick();
+  assert.equal(G.jstate.ballPacks, 2, "second purchase succeeds once affordable");
+  assert.equal(G.bonusBalls, 2);
+}
+
+/* ---------- interest divisor 8 ---------- */
+{
+  Object.assign(G, { turn: 5, coins: 40, jokers: ["interest"], shopVisits: 0, floats: [], coinfx: [],
+    blocks: [], jstate: {}, stats: { broken: 0 }, bossMod: null });
+  endTurn();
+  assert.equal(G.coins, 45, "interest divisor 8: floor(40/8)=5 gained");
+}
+{
+  Object.assign(G, { turn: 5, coins: 100, jokers: ["interest"], shopVisits: 0, floats: [], coinfx: [],
+    blocks: [], jstate: {}, stats: { broken: 0 }, bossMod: null });
+  endTurn();
+  assert.equal(G.coins, 108, "interest still caps at +8 even with 64+ held");
+}
+
+/* ---------- High Roller: x1.5 chips, pay 6 to launch ---------- */
+{
+  Object.assign(G, { jokers: ["highroller"], jstate: {}, bossMod: null, blocks: [] });
+  assert.equal(coinMult(), 1.5, "high roller: chips x1.5");
+}
+{
+  Object.assign(G, { screen: "play", dir: { x: 0, y: -1 }, balls: [], queue: [],
+    jokers: ["highroller"], coins: 10, jstate: {}, bossMod: null, blocks: [] });
+  fire();
+  assert.equal(G.coins, 4, "high roller costs 6 chips per launch (10-6=4)");
+}
+
+/* ---------- checkSupport: cascade drops a whole cluster in one update() pass ---------- */
+{
+  Object.assign(G, { coins: 0, jokers: [], particles: [], floats: [], coinfx: [],
+    destroyedThisTurn: 0, stats: { broken: 0 }, screen: "start", shake: 0,
+    blocks: [
+      // connector already broken this frame (dead); a 3-chip cluster hangs off it with no other anchor
+      { col: 1, row: 0, cw: 1, chh: 1, dispRow: 0, type: "chip", boss: false, dead: true, hp: 0, reward: 2, rot: 0 },
+      { col: 1, row: 1, cw: 1, chh: 1, dispRow: 1, type: "chip", boss: false, dead: false, hp: 3, reward: 2, rot: 0 },
+      { col: 0, row: 2, cw: 1, chh: 1, dispRow: 2, type: "chip", boss: false, dead: false, hp: 3, reward: 2, rot: 0 },
+      { col: 2, row: 2, cw: 1, chh: 1, dispRow: 2, type: "chip", boss: false, dead: false, hp: 3, reward: 2, rot: 0 },
+    ] });
+  G._died = true;
+  update(0);
+  const survivors = G.blocks.filter(b => !b.dead);
+  assert.equal(survivors.length, 0, "cutting the connector drops the whole 3-chip cluster in one update() pass");
+  assert.equal(G.destroyedThisTurn, 3, "3 chips detached");
+  assert.equal(G.stats.broken, 3);
+  assert.equal(G.coins, 6, "3 chips x reward 2 = 6 chips paid");
+  assert.equal(G.particles.filter(p => p.kind === "faller").length, 3, "3 faller particles spawned");
+}
+
+/* ---------- roster integrity: unique ids/names/icons, every id referenced in a hook ---------- */
+{
+  const seenNames = new Set(), seenIcons = new Set();
+  for (const id of cardIds) {
+    const c = CARDS[id];
+    assert.ok(!seenNames.has(c.nm), `duplicate joker name: ${c.nm}`);
+    seenNames.add(c.nm);
+    assert.ok(!seenIcons.has(c.ic), `duplicate joker icon: ${c.ic} (${id})`);
+    seenIcons.add(c.ic);
+    assert.ok(c.ds && typeof c.ds === "string" && c.ds.length > 0, `${id} has a description`);
+  }
+  const legendaryIds = cardIds.filter(id => CARDS[id].rar === "legendary");
+  assert.equal(legendaryIds.length, 4, "exactly 4 legendary jokers");
+  // every joker id must be referenced (quoted) somewhere in the script outside its own
+  // unquoted CARDS key definition -- i.e. it is wired into at least one game-logic hook.
+  for (const id of cardIds) {
+    const re = new RegExp(`['"]${id}['"]`, "g");
+    const matches = scriptMatch[1].match(re) || [];
+    assert.ok(matches.length >= 1, `joker id "${id}" is never referenced by a hook`);
+  }
+}
+
+/* ---------- Wild Card + Doppelganger recursion safety ---------- */
+{
+  Object.assign(G, { jokers: ["wildcard", "twins", "heavy"] });
+  assert.equal(count("heavy"), 2, "heavy: raw 1 + wildcard copy 1 = 2");
+  assert.equal(count("twins"), 2, "twins: raw 1 + wildcard copy 1 = 2");
+  assert.equal(count("wildcard"), 2, "wildcard: raw 1 + twins copy (leftmost-other is wildcard) = 2");
+
+  Object.assign(G, { jokers: ["wildcard", "wildcard", "twins", "twins", "heavy"] });
+  assert.equal(count("heavy"), 3, "heavy: raw 1 + 2 wildcard copies = 3");
+  assert.equal(count("wildcard"), 4, "wildcard: raw 2 + 2 twins copies = 4");
+  assert.equal(count("twins"), 4, "twins: raw 2 + 2 wildcard copies = 4");
+  // all of the above complete synchronously with finite results -- recursion guard holds.
+}
+
+/* ---------- crit / pierce determinism via scripted Math.random ---------- */
+{
+  assert.equal(critChance(), 0, "no crit jokers -> 0 chance");
+  Object.assign(G, { jokers: ["flint"] });
+  assert.equal(critChance(), 0.03, "1 copy of flint: 3% crit chance");
+  Object.assign(G, { jokers: ["flint", "flint"] });
+  assert.equal(critChance(), 0.06, "2 copies of flint: 6% crit chance");
+  Object.assign(G, { jokers: ["headhunter"] });
+  assert.equal(critChance(), 0.15, "headhunter: 15% crit chance");
+
+  Object.assign(G, { jokers: [] });
+  assert.equal(pierceChance(), 0, "no pierce jokers -> 0 chance");
+  Object.assign(G, { jokers: ["arrowhead", "arrowhead"] });
+  assert.equal(pierceChance(), 0.08, "2 copies of arrowhead: 8% pierce chance");
+  Object.assign(G, { jokers: ["ghostchip"] });
+  assert.equal(pierceChance(), 1, "ghost chip forces guaranteed pierce");
+}
+{
+  // crit doubles damage when the scripted roll lands under critChance()
+  Object.assign(G, { jokers: ["flint"], destroyedThisTurn: 0, particles: [], floats: [], coinfx: [],
+    coins: 0, stats: { broken: 0 } });
+  const b = newBlock(2, 5, 100, "chip", 1, 1);
+  const ball = { x: bx(b), y: by(b), vx: 0, vy: -1, r: 2, dmg: 5, idx: 0, anchor: false };
+  withRandomSeq([0.02], () => hitBlock(ball, b));
+  assert.equal(b.hp, 90, "crit roll under 3% doubles 5 dmg to 10 (100-10=90)");
+}
+{
+  Object.assign(G, { jokers: ["flint"], destroyedThisTurn: 0, particles: [], floats: [], coinfx: [],
+    coins: 0, stats: { broken: 0 } });
+  const b = newBlock(2, 5, 100, "chip", 1, 1);
+  const ball = { x: bx(b), y: by(b), vx: 0, vy: -1, r: 2, dmg: 5, idx: 0, anchor: false };
+  withRandomSeq([0.9], () => hitBlock(ball, b));
+  assert.equal(b.hp, 95, "crit roll over 3% does not double: plain 5 dmg (100-5=95)");
+}
+{
+  // pierce keeps the ball's incoming velocity instead of bouncing, when the scripted roll hits
+  Object.assign(G, { jokers: ["ricochet"], destroyedThisTurn: 0, particles: [], floats: [], coinfx: [],
+    coins: 0, stats: { broken: 0 } });
+  const b = newBlock(2, 5, 1, "chip", 1, 1);
+  const ball = { x: bx(b), y: by(b), vx: 3, vy: 4, r: 2, dmg: 5, idx: 0, anchor: false };
+  withConstantRandom(0.01, () => hitBlock(ball, b));
+  assert.ok(Math.abs(ball.vx - 3) < 1e-9, "pierce roll under 8%: ball keeps its incoming vx");
+  assert.ok(Math.abs(ball.vy - 4) < 1e-9, "pierce roll under 8%: ball keeps its incoming vy");
+}
+{
+  Object.assign(G, { jokers: ["ricochet"], destroyedThisTurn: 0, particles: [], floats: [], coinfx: [],
+    coins: 0, stats: { broken: 0 } });
+  const b = newBlock(2, 5, 1, "chip", 1, 1);
+  const ball = { x: bx(b), y: by(b), vx: 3, vy: 4, r: 2, dmg: 5, idx: 0, anchor: false };
+  withConstantRandom(0.99, () => hitBlock(ball, b));
+  assert.ok(ball.vx !== 3 || ball.vy !== 4, "pierce roll over 8%: ball bounces (velocity reflected, not preserved)");
 }
 
 console.log("game logic tests: ok");

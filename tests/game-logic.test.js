@@ -62,7 +62,7 @@ sandbox.globalThis = sandbox;
 
 const instrumented = scriptMatch[1].replace(
   "resize(); renderHand(); requestAnimationFrame(loop);",
-  "globalThis.__game={G,bossAlive,breakBlock,detachChip,sellValue,refreshShop,renderShop,reset,CARDS,count,ballCount,ballDmg,coinMult,wallHit,spawnRow,spawnBoss,endTurn,hitBlock,cardPrice,buildOffers,bossGeom,checkSupport,checkLoss,critChance,pierceChance,baseHpAt,newBlock,ballPackPrice,rerollPrice,openShop,update,fire,resize,bx,by,tableClearBonus,tableQuotaFor,beginTable,enterCashout,computeCashoutTally,loadMeta,saveMeta,clearMeta,isUnlocked,checkAchievements,LOCKED_JOKERS,tableName,pickOffer,storageGet,storageSet,META_KEY,LEGACY_META_KEY,advanceToNextTable,effectiveDifficultyRound,analyzeSupport,cachedSupportAnalysis,completeVolley,spawnBall,geometrySnapshot,aimWithinBoard,startVolley,settleVolley,openLastVolley,closeLastVolley,generateGoals,evaluateGoals,moveBall,syncDepth,ICON_GRIDS,PAL,iconURI,renderGoals};"
+  "globalThis.__game={G,bossAlive,breakBlock,detachChip,sellValue,refreshShop,renderShop,reset,CARDS,count,ballCount,ballDmg,coinMult,wallHit,spawnRow,spawnBoss,endTurn,hitBlock,cardPrice,buildOffers,bossGeom,checkSupport,checkLoss,critChance,pierceChance,baseHpAt,newBlock,ballPackPrice,rerollPrice,openShop,update,fire,resize,bx,by,tableClearBonus,tableQuotaFor,beginTable,enterCashout,computeCashoutTally,loadMeta,saveMeta,clearMeta,isUnlocked,checkAchievements,LOCKED_JOKERS,tableName,pickOffer,storageGet,storageSet,META_KEY,LEGACY_META_KEY,advanceToNextTable,effectiveDifficultyRound,analyzeSupport,cachedSupportAnalysis,completeVolley,spawnBall,geometrySnapshot,aimWithinBoard,startVolley,settleVolley,openLastVolley,closeLastVolley,generateGoals,evaluateGoals,moveBall,syncDepth,ICON_GRIDS,PAL,iconURI,renderGoals,rawCount,openJokerTip,closeJokerTip,down,onDocPointerDownForTip};"
 );
 assert.notEqual(instrumented, scriptMatch[1], "game script test hook was installed");
 vm.runInNewContext(instrumented, sandbox);
@@ -76,7 +76,7 @@ const {
   isUnlocked, checkAchievements, LOCKED_JOKERS, tableName, pickOffer, storageGet, storageSet, META_KEY, LEGACY_META_KEY, advanceToNextTable,
   effectiveDifficultyRound, analyzeSupport, cachedSupportAnalysis, completeVolley, spawnBall, geometrySnapshot, aimWithinBoard,
   tableQuotaFor, startVolley, settleVolley, openLastVolley, closeLastVolley, generateGoals, evaluateGoals, detachChip, moveBall, syncDepth,
-  ICON_GRIDS, PAL, iconURI, renderGoals,
+  ICON_GRIDS, PAL, iconURI, renderGoals, rawCount, openJokerTip, closeJokerTip, down, onDocPointerDownForTip,
 } = sandbox.__game;
 
 resize();
@@ -231,7 +231,7 @@ for (const id of cardIds) assert.ok(validRar.has(CARDS[id].rar), `${id} has a va
   for (const b of G.blocks) {
     assert.equal(b.type, "chip");
     assert.equal(b.cw, 1);
-    assert.equal(b.hp, 42, "baseHpAt(36)=42, mid roll (0.5) -> round(42*1.0)=42");
+    assert.equal(b.hp, 37, "baseHpAt(36)=37, mid roll (0.5) -> round(37*1.0)=37");
   }
 }
 
@@ -247,7 +247,7 @@ for (const id of cardIds) assert.ok(validRar.has(CARDS[id].rar), `${id} has a va
   Object.assign(G, { table: 2, bossOvertime: true, blocks: [] });
   withRandomSeq([0.3], () => spawnBoss());
   const boss = G.blocks.find(b => b.boss);
-  assert.equal(boss.hp, 188, "boss 2 hp = round(baseHpAt(24)*7.5) = round(25*7.5)");
+  assert.equal(boss.hp, 165, "boss 2 hp = round(baseHpAt(24)*7.5) = round(22*7.5)");
   assert.equal(G.bossMod, "scissors", "boss rules follow the visible four-table cycle");
   assert.equal(boss.armor, 2, "armor = 1+ceil(table/2)");
   assert.equal(boss.gcol, 0, "placement roll 0.3*3=0.9 floors to gcol 0");
@@ -343,6 +343,63 @@ for (const id of cardIds) assert.ok(validRar.has(CARDS[id].rar), `${id} has a va
   assert.equal(G.coins, 2, "detached chips retain their normal Cash payout");
   assert.equal(G.particles.length, 1, "a faller particle is spawned");
   assert.equal(G.particles[0].kind, "faller");
+  assert.equal(G.particles[0].smashDmg, 1, "smashDmg = max(1, round(hp*0.25)) snapshotted at detach");
+  assert.equal(G.particles[0].smashed.length, 0, "a fresh faller has smashed nothing yet");
+}
+
+/* ---------- faller smash: a falling chip damages what it passes through, once each ---------- */
+{
+  Object.assign(G, { coins: 0, jokers: [], particles: [], floats: [], coinfx: [],
+    destroyedThisTurn: 0, stats: { broken: 0 }, screen: 'shop', _died: false,
+    blocks: [
+      { id: 'nonlethal', type: 'chip', boss: false, dead: false, row: 5, col: 2, cw: 1, chh: 1, dispRow: 5, hp: 10, maxhp: 10, reward: 1, kind: 'square', squash: 0, flash: 0 },
+    ] });
+  const target = G.blocks[0], tx = bx(target), ty = by(target);
+  const p = { kind: 'faller', x: tx, y: ty, vy: 0, vr: 0, delay: 0, rot: 0, sKind: 'square', cw: 1, chh: 1, hp: 8, life: 1, smashDmg: 2, smashed: [] };
+  G.particles = [p];
+  update(0.001);
+  assert.equal(target.hp, 8, "a faller deals smashDmg to a chip whose band it passes through");
+  assert.deepEqual(p.smashed, ['nonlethal'], "the smashed chip's id is recorded on the faller");
+  update(0.001);
+  assert.equal(target.hp, 8, "a second pass over the same chip does not re-hit it");
+  assert.equal(p.smashed.length, 1, "smashed ids are not duplicated on repeat passes");
+}
+{
+  Object.assign(G, { coins: 0, jokers: [], particles: [], floats: [], coinfx: [],
+    destroyedThisTurn: 0, stats: { broken: 0 }, screen: 'shop', _died: false,
+    blocks: [
+      { id: 'lethal', type: 'chip', boss: false, dead: false, row: 5, col: 2, cw: 1, chh: 1, dispRow: 5, hp: 2, maxhp: 2, reward: 3, kind: 'square', squash: 0, flash: 0 },
+    ] });
+  const target = G.blocks[0], tx = bx(target), ty = by(target);
+  G.particles = [{ kind: 'faller', x: tx, y: ty, vy: 0, vr: 0, delay: 0, rot: 0, sKind: 'square', cw: 1, chh: 1, hp: 8, life: 1, smashDmg: 2, smashed: [] }];
+  update(0.001);
+  assert.equal(target.dead, true, "a lethal smash kills the chip via the normal breakBlock path");
+  assert.equal(G.coins, 3, "the smashed kill pays its normal Cash reward through breakBlock");
+  assert.equal(G.stats.broken, 1, "a fall-smashed kill counts as a normal break in stats");
+}
+{
+  // smash cap: a single faller smashes at most 4 chips
+  Object.assign(G, { coins: 0, jokers: [], particles: [], floats: [], coinfx: [],
+    destroyedThisTurn: 0, stats: { broken: 0 }, screen: 'shop', _died: false });
+  const chips = [];
+  for (let r = 0; r < 5; r++) chips.push({ id: 'cap' + r, type: 'chip', boss: false, dead: false, row: r, col: 2, cw: 1, chh: 1, dispRow: r, hp: 100, maxhp: 100, reward: 1, kind: 'square', squash: 0, flash: 0 });
+  G.blocks = chips;
+  const p = { kind: 'faller', x: 0, y: 0, vy: 0, vr: 0, delay: 0, rot: 0, sKind: 'square', cw: 1, chh: 1, hp: 8, life: 1, smashDmg: 1, smashed: [] };
+  G.particles = [p];
+  for (let i = 0; i < 5; i++) { p.x = bx(chips[i]); p.y = by(chips[i]); update(0); }
+  assert.equal(p.smashed.length, 4, "a single faller smashes at most 4 chips");
+  assert.equal(chips[4].hp, 100, "the 5th chip in range is untouched once the smash cap is hit");
+}
+{
+  // boss armor applies to fall-smash damage, plain max(1, smashDmg-armor)
+  Object.assign(G, { coins: 0, jokers: [], particles: [], floats: [], coinfx: [], destroyedThisTurn: 0, stats: { broken: 0 },
+    screen: 'shop', _died: false, bossMod: null, bossMod2: null, bossKillsThisRun: 0, newUnlocksThisRun: [] });
+  const boss = { id: 'bossf', type: 'chip', boss: true, dead: false, row: 3, rowSpan: 2, dispRow: 3, col: 1, gcol: 1, gcols: 3, hp: 20, maxhp: 20, armor: 3, reward: 4 };
+  G.blocks = [boss];
+  const g = bossGeom(boss);
+  G.particles = [{ kind: 'faller', x: g.cx, y: g.cy, vy: 0, vr: 0, delay: 0, rot: 0, sKind: 'square', cw: 1, chh: 1, hp: 8, life: 1, smashDmg: 5, smashed: [] }];
+  update(0);
+  assert.equal(boss.hp, 18, "boss smash damage = max(1, smashDmg-armor) = max(1,5-3) = 2");
 }
 {
   Object.assign(G, { coins: 0, jokers: [], particles: [], floats: [], coinfx: [],
@@ -378,7 +435,7 @@ for (const id of cardIds) assert.ok(validRar.has(CARDS[id].rar), `${id} has a va
 
 /* ---------- baseHp curve spot values ---------- */
 {
-  const spots = { 1: 1, 2: 2, 3: 3, 4: 3, 17: 16, 40: 48 };
+  const spots = { 1: 1, 2: 2, 3: 2, 4: 3, 17: 15, 40: 43 };
   for (const [t, expected] of Object.entries(spots)) {
     assert.equal(baseHpAt(Number(t)), expected, `baseHpAt(${t}) === ${expected}`);
   }
@@ -388,12 +445,12 @@ for (const id of cardIds) assert.ok(validRar.has(CARDS[id].rar), `${id} has a va
 {
   Object.assign(G, { table: 1, bossOvertime: true, blocks: [] });
   withRandomSeq([0.1], () => spawnBoss());
-  assert.equal(G.blocks.find(b => b.boss).hp, 83, "boss 1 hp = round(baseHpAt(12)*7.5) = round(11*7.5)");
+  assert.equal(G.blocks.find(b => b.boss).hp, 75, "boss 1 hp = round(baseHpAt(12)*7.5) = round(10*7.5)");
 }
 {
   Object.assign(G, { table: 4, bossOvertime: true, blocks: [] });
   withRandomSeq([0.1], () => spawnBoss());
-  assert.equal(G.blocks.find(b => b.boss).hp, 450, "boss 4 hp = round(baseHpAt(48)*7.5) = 60*7.5");
+  assert.equal(G.blocks.find(b => b.boss).hp, 405, "boss 4 hp = round(baseHpAt(48)*7.5) = 54*7.5");
 }
 
 /* ---------- boss gap placement: deterministic roll -> gcol, always 5 columns wide ---------- */
@@ -988,8 +1045,8 @@ assert.ok(Object.values(CARDS).every(c=>Array.isArray(c.tags)&&c.tags.length),'a
 
 /* ---------- Phase 2: score ledger, goals, receipts, collection overtime ---------- */
 {
-  assert.deepEqual([1,2,3,4,5,6,7,8].map(tableQuotaFor), [300,900,1800,3000,4200,5600,7200,8600]);
-  assert.equal(tableQuotaFor(9), Math.round(8600*1.35), "overtime quota scales from table 8");
+  assert.deepEqual([1,2,3,4,5,6,7,8].map(tableQuotaFor), [375,1125,2250,3750,5250,7000,9000,10750]);
+  assert.equal(tableQuotaFor(9), Math.round(10750*1.35), "overtime quota scales from table 8");
   reset();
   assert.equal(G.activeGoals.length, 3, "every board starts with exactly three goals");
   assert.equal(JSON.stringify(G.activeGoals.map(g=>[g.tier,g.bonus,g.cash])), JSON.stringify([['easy',.25,1],['medium',.5,2],['hard',.75,3]]));
@@ -1112,6 +1169,46 @@ assert.ok(Object.values(CARDS).every(c=>Array.isArray(c.tags)&&c.tags.length),'a
   endTurn();
   assert.equal(G.screen,'cashout','meeting quota after boss death cashes out instead of spawning collection pressure');
   assert.equal(G.coins,12+tableClearBonus(2),'cashout adds only the table bonus after the boss payout was already earned');
+}
+
+{
+  // joker tap-to-inspect tooltip
+  Object.assign(G,{screen:'play',jokers:['thrifty','stash']});
+  closeJokerTip();
+  const tip=getElement('jokerTip');
+  assert.equal(tip.classList.contains('show'),false,'tip starts closed');
+  openJokerTip('thrifty');
+  assert.equal(tip.classList.contains('show'),true,'openJokerTip on a held joker shows the tip');
+  assert.ok(tip.innerHTML.includes(CARDS.thrifty.nm),'tip content includes the joker name');
+  assert.ok(tip.innerHTML.includes(CARDS.thrifty.ds),'tip content includes the effect text');
+  closeJokerTip();
+  assert.equal(tip.classList.contains('show'),false,'closeJokerTip hides the tip');
+  // open by index too
+  openJokerTip(1);
+  assert.equal(tip.classList.contains('show'),true,'openJokerTip accepts a hand index');
+  assert.ok(tip.innerHTML.includes(CARDS.stash.nm),'index-based open resolves to the correct joker');
+  closeJokerTip();
+  // not held -> no-op
+  openJokerTip('wildcard');
+  assert.equal(tip.classList.contains('show'),false,'openJokerTip ignores an id that is not currently held');
+  // duplicate count line
+  Object.assign(G,{jokers:['thrifty','thrifty','stash']});
+  openJokerTip('thrifty');
+  assert.ok(tip.innerHTML.includes('×2 held'),'tip shows a held-count line when duplicated');
+  closeJokerTip();
+}
+{
+  // dismissing tap must not start aiming on the very next canvas pointerdown
+  Object.assign(G,{screen:'play',jokers:['thrifty'],balls:[],queue:[],aiming:false});
+  const fakeEvent={ preventDefault(){}, clientX:10, clientY:10, pointerId:1 };
+  openJokerTip('thrifty');
+  onDocPointerDownForTip();
+  assert.equal(getElement('jokerTip').classList.contains('show'),false,'the document-level dismiss handler closes the tip');
+  down(fakeEvent);
+  assert.equal(G.aiming,false,'the pointerdown that dismissed the tip is consumed and does not start aiming');
+  down(fakeEvent);
+  assert.equal(G.aiming,true,'the following pointerdown behaves normally and starts aiming');
+  G.aiming=false; G.activePointer=null;
 }
 
 console.log("game logic tests: ok");

@@ -123,7 +123,7 @@ Locked jokers don't appear in the shop until unlocked. The pool remains healthy 
 
 - One `index.html`. Vanilla JS + Canvas. **No build step or bundled assets.**
 - Real circle-vs-convex-polygon collision so the irregular multi-cell blocks bounce off their actual angled faces.
-- Chips render from a lazily-built, per-tier sprite cache (casino chip look: rim, edge spots, printed ring, sheen) instead of being redrawn as flat polygons every frame.
+- Chips render from a lazily-built, per-tier sprite cache (modern-retro style: flat two-tone shading, hard offset shadows, pixel iconography) instead of being redrawn as flat polygons every frame.
 - Hand-drawn pixel-art icon set (101 icons defined as character grids in-source, zero external assets) replaces emojis for all visual indicators and joker names.
 - Display fonts (**Silkscreen** and **Space Grotesk**) embedded as base64 in HTML for fully offline, zero-dependency gameplay (SIL OFL licensed).
 - WebAudio for all sound (synthesized, nothing to download).

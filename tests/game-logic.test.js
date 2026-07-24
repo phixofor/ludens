@@ -62,7 +62,7 @@ sandbox.globalThis = sandbox;
 
 const instrumented = scriptMatch[1].replace(
   "resize(); renderHand(); requestAnimationFrame(loop);",
-  "globalThis.__game={G,bossAlive,breakBlock,detachChip,sellValue,refreshShop,renderShop,reset,CARDS,count,ballCount,ballDmg,coinMult,wallHit,spawnRow,spawnBoss,endTurn,hitBlock,cardPrice,buildOffers,bossGeom,checkSupport,checkLoss,critChance,pierceChance,baseHpAt,newBlock,ballPackPrice,rerollPrice,openShop,update,fire,resize,bx,by,tableClearBonus,tableQuotaFor,beginTable,enterCashout,computeCashoutTally,loadMeta,saveMeta,clearMeta,isUnlocked,checkAchievements,LOCKED_JOKERS,tableName,pickOffer,storageGet,storageSet,META_KEY,LEGACY_META_KEY,advanceToNextTable,effectiveDifficultyRound,analyzeSupport,cachedSupportAnalysis,completeVolley,spawnBall,geometrySnapshot,aimWithinBoard,startVolley,settleVolley,openLastVolley,closeLastVolley,generateGoals,evaluateGoals};"
+  "globalThis.__game={G,bossAlive,breakBlock,detachChip,sellValue,refreshShop,renderShop,reset,CARDS,count,ballCount,ballDmg,coinMult,wallHit,spawnRow,spawnBoss,endTurn,hitBlock,cardPrice,buildOffers,bossGeom,checkSupport,checkLoss,critChance,pierceChance,baseHpAt,newBlock,ballPackPrice,rerollPrice,openShop,update,fire,resize,bx,by,tableClearBonus,tableQuotaFor,beginTable,enterCashout,computeCashoutTally,loadMeta,saveMeta,clearMeta,isUnlocked,checkAchievements,LOCKED_JOKERS,tableName,pickOffer,storageGet,storageSet,META_KEY,LEGACY_META_KEY,advanceToNextTable,effectiveDifficultyRound,analyzeSupport,cachedSupportAnalysis,completeVolley,spawnBall,geometrySnapshot,aimWithinBoard,startVolley,settleVolley,openLastVolley,closeLastVolley,generateGoals,evaluateGoals,moveBall,syncDepth};"
 );
 assert.notEqual(instrumented, scriptMatch[1], "game script test hook was installed");
 vm.runInNewContext(instrumented, sandbox);
@@ -75,7 +75,7 @@ const {
   tableClearBonus, beginTable, enterCashout, computeCashoutTally, loadMeta, saveMeta, clearMeta,
   isUnlocked, checkAchievements, LOCKED_JOKERS, tableName, pickOffer, storageGet, storageSet, META_KEY, LEGACY_META_KEY, advanceToNextTable,
   effectiveDifficultyRound, analyzeSupport, cachedSupportAnalysis, completeVolley, spawnBall, geometrySnapshot, aimWithinBoard,
-  tableQuotaFor, startVolley, settleVolley, openLastVolley, closeLastVolley, generateGoals, evaluateGoals, detachChip,
+  tableQuotaFor, startVolley, settleVolley, openLastVolley, closeLastVolley, generateGoals, evaluateGoals, detachChip, moveBall, syncDepth,
 } = sandbox.__game;
 
 resize();
@@ -246,9 +246,13 @@ for (const id of cardIds) assert.ok(validRar.has(CARDS[id].rar), `${id} has a va
   Object.assign(G, { table: 2, bossOvertime: true, blocks: [] });
   withRandomSeq([0.3], () => spawnBoss());
   const boss = G.blocks.find(b => b.boss);
-  assert.equal(boss.hp, 175, "boss 2 hp = baseHpAt(24)*7 = 25*7");
+  assert.equal(boss.hp, 188, "boss 2 hp = round(baseHpAt(24)*7.5) = round(25*7.5)");
   assert.equal(G.bossMod, "scissors", "boss rules follow the visible four-table cycle");
   assert.equal(boss.armor, 2, "armor = 1+ceil(table/2)");
+  assert.equal(boss.gcol, 0, "placement roll 0.3*3=0.9 floors to gcol 0");
+  assert.equal(boss.gcols, 5, "boss always spans BOSS_GCOLS=5 columns");
+  syncDepth();
+  assert.equal(getElement('depthLine').textContent, 'THE SCISSORS', "boss depth label drops the 'BOSS · ' prefix so it doesn't overlap the score stat");
 }
 
 /* ---------- boss pressure rows during boss fights ---------- */
@@ -379,16 +383,67 @@ for (const id of cardIds) assert.ok(validRar.has(CARDS[id].rar), `${id} has a va
   }
 }
 
-/* ---------- boss hp = baseHpAt(12*num)*7 across multiple tables ---------- */
+/* ---------- boss hp = round(baseHpAt(12*num)*7.5) across multiple tables ---------- */
 {
   Object.assign(G, { table: 1, bossOvertime: true, blocks: [] });
   withRandomSeq([0.1], () => spawnBoss());
-  assert.equal(G.blocks.find(b => b.boss).hp, 77, "boss 1 hp = baseHpAt(12)*7");
+  assert.equal(G.blocks.find(b => b.boss).hp, 83, "boss 1 hp = round(baseHpAt(12)*7.5) = round(11*7.5)");
 }
 {
   Object.assign(G, { table: 4, bossOvertime: true, blocks: [] });
   withRandomSeq([0.1], () => spawnBoss());
-  assert.equal(G.blocks.find(b => b.boss).hp, 420, "boss 4 hp = baseHpAt(48)*7");
+  assert.equal(G.blocks.find(b => b.boss).hp, 450, "boss 4 hp = round(baseHpAt(48)*7.5) = 60*7.5");
+}
+
+/* ---------- boss gap placement: deterministic roll -> gcol, always 5 columns wide ---------- */
+{
+  Object.assign(G, { table: 1, bossOvertime: true, blocks: [] });
+  withRandomSeq([0.1], () => spawnBoss());
+  let boss = G.blocks.find(b => b.boss);
+  assert.equal(boss.gcol, 0, "roll 0.1*3=0.3 floors to gcol 0 (left-flush)");
+  assert.equal(boss.gcols, 5, "boss always spans 5 columns");
+
+  Object.assign(G, { table: 1, bossOvertime: true, blocks: [] });
+  withRandomSeq([0.4], () => spawnBoss());
+  boss = G.blocks.find(b => b.boss);
+  assert.equal(boss.gcol, 1, "roll 0.4*3=1.2 floors to gcol 1 (centered)");
+
+  Object.assign(G, { table: 1, bossOvertime: true, blocks: [] });
+  withRandomSeq([0.7], () => spawnBoss());
+  boss = G.blocks.find(b => b.boss);
+  assert.equal(boss.gcol, 2, "roll 0.7*3=2.1 floors to gcol 2 (right-flush)");
+}
+
+/* ---------- boss gap width: each gap fits at least 3 ball diameters ---------- */
+{
+  Object.assign(G, { table: 1, bossOvertime: true, blocks: [] });
+  withRandomSeq([0.4], () => spawnBoss());
+  const boss = G.blocks.find(b => b.boss), snap = geometrySnapshot();
+  const gapCols = snap.cols - boss.gcols;
+  assert.ok(gapCols * snap.cellW >= 3 * (2 * snap.ballR), "total gap width across the board fits at least 3 ball diameters");
+}
+
+/* ---------- anchor-overlap: boss anchors only column-overlapping chips in adjacent rows ---------- */
+{
+  Object.assign(G, { coins: 0, jokers: [], particles: [], floats: [], coinfx: [],
+    destroyedThisTurn: 0, stats: { broken: 0 },
+    blocks: [
+      { boss: true, dead: false, row: 3, rowSpan: 2, hp: 50, armor: 1, dispRow: 3, gcol: 1, gcols: 5 },
+      { col: 1, row: 2, cw: 5, chh: 1, type: 'chip', boss: false, dead: false, hp: 3, reward: 2, rot: 0 },
+      { col: 0, row: 5, cw: 1, chh: 1, type: 'chip', boss: false, dead: false, hp: 3, reward: 2, rot: 0 },
+    ] });
+  const detached = checkSupport();
+  assert.equal(detached, true, "the gap-column chip with no other chain detaches");
+  assert.equal(G.blocks[1].dead, false, "the chip overlapping the boss's real column span (row 2, col 1..6) stays anchored");
+  assert.equal(G.blocks[2].dead, true, "the chip in the boss's gap column (row 5, col 0, outside gcol 1..5) is not anchored by the boss");
+}
+
+/* ---------- bossGeom: legacy fallback reproduces full-width geometry with no gcol/gcols ---------- */
+{
+  const boss = { boss: true, dead: false, row: 0, rowSpan: 2, hp: 50, armor: 1, dispRow: 0 };
+  const g = bossGeom(boss), snap = geometrySnapshot();
+  assert.equal(g.hw, snap.boardSize * 0.47, "legacy fallback: half-width equals boardSize*0.47");
+  assert.equal(g.cx, snap.boardLeft + snap.boardSize / 2, "legacy fallback: center is the board center");
 }
 
 /* ---------- Bank Shot: ceiling hits never trigger the bonus ---------- */
@@ -628,12 +683,14 @@ for (const id of cardIds) assert.ok(validRar.has(CARDS[id].rar), `${id} has a va
   assert.equal(G.bossMod,'vault','table 5 cycles back to The Vault');
   assert.equal(G.bossMod2,null,'bosses expose one readable rule at a time');
   assert.equal(G.blocks.find(b=>b.boss).sealed,true,'The Vault starts sealed');
+  assert.equal(G.blocks.find(b=>b.boss).gcol,0,'placement roll 0.3*3=0.9 floors to gcol 0');
 }
 {
   Object.assign(G, { table: 4, bossOvertime: true, blocks: [] });
   withRandomSeq([0.1], () => spawnBoss());
   assert.equal(G.bossMod,'splitpot','table 4 previews and spawns Split Pot');
   assert.equal(G.bossMod2, null, "legacy hidden second modifiers stay removed");
+  assert.equal(G.blocks.find(b=>b.boss).gcol,0,'placement roll 0.1*3=0.3 floors to gcol 0');
 }
 
 assert.ok(Object.values(CARDS).every(c=>Array.isArray(c.tags)&&c.tags.length),'all 89 jokers carry at least one archetype tag');
@@ -822,7 +879,7 @@ assert.ok(Object.values(CARDS).every(c=>Array.isArray(c.tags)&&c.tags.length),'a
   assert.ok(Math.abs(G.floats[0].size-10*scale)<1e-9,"resize remaps explicit float size");
   assert.ok(Math.abs(G.coinfx[0].x-(resized.boardLeft+resized.boardSize*0.7))<1e-9,"resize remaps coin effect position");
   Object.assign(G,{balls:[],dir:{x:0,y:-1},ballIdx:0,jokers:[],stats:{broken:0},jstate:{}}); spawnBall(false);
-  assert.equal(Math.hypot(G.balls[0].vx,G.balls[0].vy),resized.speed,"queued balls use the resized speed consistently");
+  assert.ok(Math.abs(Math.hypot(G.balls[0].vx,G.balls[0].vy)-0.55*resized.speed)<1e-9,"queued balls launch at 0.55x the resized speed (Holedown ramp-up)");
   stage.clientWidth=350; stage.clientHeight=600; G.balls=[]; resize();
 
   assert.equal(effectiveDifficultyRound(), 1, "Table 1 starts at the legacy difficulty floor");
@@ -841,6 +898,24 @@ assert.ok(Object.values(CARDS).every(c=>Array.isArray(c.tags)&&c.tags.length),'a
   assert.notStrictEqual(invalidated,cached,"support cache invalidates when block geometry changes");
   assert.equal(invalidated.unsupportedIds.length,0,"invalidated support analysis reflects the mutation");
 }
+
+/* ---------- Holedown launch-acceleration ramp (Part 2b) ---------- */
+{
+  const geometry=geometrySnapshot(), savedBlocks=G.blocks;
+  G.blocks=[];
+  const ball={x:geometry.boardLeft+geometry.boardSize/2,y:geometry.launchY-geometry.cellW*3,vx:0.55*geometry.speed,vy:0,r:geometry.ballR,dmg:1,age:0,sq:0,idx:0};
+  moveBall(ball,0.1);
+  const s1=Math.hypot(ball.vx,ball.vy);
+  assert.ok(s1>0.55*geometry.speed-1e-9 && s1<geometry.speed+1e-9,"ramp increases speed toward full SPEED without exceeding it");
+  moveBall(ball,0.1);
+  const s2=Math.hypot(ball.vx,ball.vy);
+  assert.ok(s2>=s1-1e-9,"ramp speed keeps increasing (or holds) as age approaches 0.35s");
+  moveBall(ball,0.29);
+  const s3=Math.hypot(ball.vx,ball.vy);
+  assert.ok(Math.abs(s3-geometry.speed)<1e-6,"once age passes 0.35s (still under the 0.5s rescale window) speed reaches full SPEED");
+  G.blocks=savedBlocks;
+}
+
 {
   reset();
   Object.assign(G,{screen:'play',roundInTable:2,totalVolleys:1,turn:2,blocks:[],jokers:[],coins:0,shopVisits:0,floats:[],coinfx:[]});

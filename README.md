@@ -1,6 +1,6 @@
 # 🎱 BALLATRO
 
-A single-file mobile web game that mashes **Holedown**'s squishy ball-bouncing with **Balatro**'s joker-card economy. Break the chips, bank the money, stack five jokers, and survive each table's six rounds plus boss overtime.
+A single-file mobile web game that mashes **Holedown**'s elongated capsule ball physics with **Balatro**'s joker-card economy. Break the chips, bank the money, stack five jokers, and survive each table's six rounds plus boss overtime.
 
 ![Gameplay](ballatro/screenshots/gameplay.png)
 
@@ -8,7 +8,7 @@ A single-file mobile web game that mashes **Holedown**'s squishy ball-bouncing w
 
 ## How to play
 
-- **Drag** anywhere to aim, release to fire your stream of balls.
+- **Drag** anywhere to aim, release to fire elongated capsules that accelerate out of the launcher.
 - **Tap** mid-flight to fast-forward the bounce.
 - Clear the chips before they cross the dashed danger line. **Chips are supported by anchors** — the top row (newest, attached to the ceiling) and the boss (if alive). Break a chip holding up a cluster and the rest **fall off the board**, adding their starting HP to Score while retaining their normal Cash payout. This is the core skill: aim for the load-bearing block, not the stack above it.
 - The **shop** opens after rounds 2 and 4, then again after the boss. You hold five jokers, and every shop sells **Ball Packs** for permanent +1 ball ($10 Cash first, +$6 each after).
@@ -79,7 +79,7 @@ Bank Shot adds +1 damage per side-wall bounce (left/right walls), capped at **+3
 
 ## Boss
 
-A full-width, two-row armored brick arrives after round 6. Damage normally uses `max(1, ball_damage − armor)`; HP is `baseHp(12*num)*7`, armor is `1 + ceil(table/2)`, and the Cash reward is 20% of starting HP. The next boss and its rule are previewed in every shop.
+An armored brick occupying 5 of 7 columns arrives after round 6, leaving a threadable gap. You can position balls to get behind the boss, cut shielded rows beneath it, and ricochet off its top face for direct damage. Damage normally uses `max(1, ball_damage − armor)`; HP is `baseHp(12*num)*7`, armor is `1 + ceil(table/2)`, and the Cash reward is 20% of starting HP. The next boss and its rule are previewed in every shop.
 
 Boss fights are no longer a breather: every second failed boss-overtime volley spawns a half-HP pressure row. Boss rules follow a visible four-table cycle:
 

@@ -39,7 +39,7 @@ Progress through eight named casino floors, each ending with a boss encounter. B
 
 ## Jokers
 
-Five slots, 89 jokers across four rarities. Shop offers roll **55% common / 32% uncommon / 11% rare / 2% legendary** per slot. Cards marked ⚠ are double-edged.
+Five slots, 89 jokers across four rarities. Shop offers roll **55% common / 32% uncommon / 11% rare / 2% legendary** per slot. Cards marked with warning icons are double-edged.
 
 Every joker has gameplay archetype tags (damage, balls, Cash, cascade, precision, shop, risk, or utility). Once your hand develops an identity, one shop slot is biased toward its dominant tag while keeping that slot's original rarity roll; offers remain unique.
 
@@ -54,16 +54,16 @@ Every joker has gameplay archetype tags (damage, balls, Cash, cascade, precision
 
 | Joker | Effect | Rarity |
 |---|---|---|
-| 💪 Heavy Chips | +1 damage on every ball | Common |
-| 🏦 Interest | +$2 Cash per $8 held at round end (cap $16) | Common |
-| 🔦 Laser Sight ⚠ | shows the full reflected aim path, but −25% Cash | Common |
-| 🎱 Extra Ball | +1 ball each launch | Uncommon |
-| 👑 Midas Touch | +50% Cash from breaks | Uncommon |
-| 🎯 Bank Shot | +1 damage per side-wall bounce (max +3) | Uncommon |
-| 🔪 Glass Cannon ⚠ | +3 damage, but −2 balls | Rare |
-| ⚡ Chain Reaction | breaks deal 1 damage to nearby chips | Rare |
-| 🃏 Wild Card | counts as one copy of every other joker you hold | Legendary |
-| 👻 Ghost Chip | balls always pierce killed chips | Legendary |
+| Heavy Chips | +1 damage on every ball | Common |
+| Interest | +$2 Cash per $8 held at round end (cap $16) | Common |
+| Laser Sight | shows the full reflected aim path, but −25% Cash | Common |
+| Extra Ball | +1 ball each launch | Uncommon |
+| Midas Touch | +50% Cash from breaks | Uncommon |
+| Bank Shot | +1 damage per side-wall bounce (max +3) | Uncommon |
+| Glass Cannon | +3 damage, but −2 balls | Rare |
+| Chain Reaction | breaks deal 1 damage to nearby chips | Rare |
+| Wild Card | counts as one copy of every other joker you hold | Legendary |
+| Ghost Chip | balls always pierce killed chips | Legendary |
 
 Default aim only shows a straight direction ray — Laser Sight is the only way to preview bounces.
 
@@ -102,20 +102,20 @@ Fourteen rare and legendary jokers are locked behind achievements, encouraging l
 
 | Joker | Rarity | Unlock Condition |
 |---|---|---|
-| 👯 Twins | Rare | Reach Table 2 |
-| ⛓️ Chain | Rare | Reach Table 3 |
-| 🔗 Snowball | Rare | Reach Table 4 |
-| 🏛️ Phalanx | Rare | Reach Table 5 |
-| 💼 Investor | Rare | Reach Table 6 |
-| 🪞 Hall of Mirrors | Rare | Reach Table 7 |
-| 🎯 Headhunter | Rare | Defeat your first boss |
-| 💥 Shatterpoint | Rare | Break a 5+ chip cascade in one turn |
-| ⏰ Timebomb | Rare | Launch 50 balls (lifetime) |
-| 🏔️ Avalanche | Rare | Break 500 chips (lifetime) |
-| 🃏 Wild Card (leg) | Legendary | Beat Table 8 (The House) |
-| 👻 Ghost Chip (leg) | Legendary | Defeat 3 bosses (lifetime) |
-| 💰 Jackpot (leg) | Legendary | Bank 500 chips in a single run |
-| ♻️ Ouroboros (leg) | Legendary | Break 1000 chips (lifetime) |
+| Twins | Rare | Reach Table 2 |
+| Chain | Rare | Reach Table 3 |
+| Snowball | Rare | Reach Table 4 |
+| Phalanx | Rare | Reach Table 5 |
+| Investor | Rare | Reach Table 6 |
+| Hall of Mirrors | Rare | Reach Table 7 |
+| Headhunter | Rare | Defeat your first boss |
+| Shatterpoint | Rare | Break a 5+ chip cascade in one turn |
+| Timebomb | Rare | Launch 50 balls (lifetime) |
+| Avalanche | Rare | Break 500 chips (lifetime) |
+| Wild Card (leg) | Legendary | Beat Table 8 (The House) |
+| Ghost Chip (leg) | Legendary | Defeat 3 bosses (lifetime) |
+| Jackpot (leg) | Legendary | Bank 500 chips in a single run |
+| Ouroboros (leg) | Legendary | Break 1000 chips (lifetime) |
 
 Locked jokers don't appear in the shop until unlocked. The pool remains healthy — a core set of commons and uncommons is always available, and rares/legendaries unlock progressively as you play.
 
@@ -124,8 +124,10 @@ Locked jokers don't appear in the shop until unlocked. The pool remains healthy 
 - One `index.html`. Vanilla JS + Canvas. **No build step or bundled assets.**
 - Real circle-vs-convex-polygon collision so the irregular multi-cell blocks bounce off their actual angled faces.
 - Chips render from a lazily-built, per-tier sprite cache (casino chip look: rim, edge spots, printed ring, sheen) instead of being redrawn as flat polygons every frame.
+- Hand-drawn pixel-art icon set (101 icons defined as character grids in-source, zero external assets) replaces emojis for all visual indicators and joker names.
+- Display fonts (**Silkscreen** and **Space Grotesk**) embedded as base64 in HTML for fully offline, zero-dependency gameplay (SIL OFL licensed).
 - WebAudio for all sound (synthesized, nothing to download).
-- `localStorage` for meta-progression (best table, lifetime stats, unlocked joker IDs); in-memory fallback if unavailable. Display fonts load from Google Fonts with system fallbacks, so gameplay still works if the font request is unavailable.
+- `localStorage` for meta-progression (best table, lifetime stats, unlocked joker IDs); in-memory fallback if unavailable.
 
 ## Tuning knobs
 

@@ -62,7 +62,7 @@ sandbox.globalThis = sandbox;
 
 const instrumented = scriptMatch[1].replace(
   "resize(); renderHand(); requestAnimationFrame(loop);",
-  "globalThis.__game={G,bossAlive,breakBlock,detachChip,sellValue,refreshShop,renderShop,reset,CARDS,count,ballCount,ballDmg,coinMult,wallHit,spawnRow,spawnBoss,endTurn,hitBlock,cardPrice,buildOffers,bossGeom,checkSupport,checkLoss,critChance,pierceChance,baseHpAt,newBlock,ballPackPrice,rerollPrice,openShop,update,fire,resize,bx,by,tableClearBonus,tableQuotaFor,beginTable,enterCashout,computeCashoutTally,loadMeta,saveMeta,clearMeta,isUnlocked,checkAchievements,LOCKED_JOKERS,tableName,pickOffer,storageGet,storageSet,META_KEY,LEGACY_META_KEY,advanceToNextTable,effectiveDifficultyRound,analyzeSupport,cachedSupportAnalysis,completeVolley,spawnBall,geometrySnapshot,aimWithinBoard,startVolley,settleVolley,openLastVolley,closeLastVolley,generateGoals,evaluateGoals,moveBall,syncDepth};"
+  "globalThis.__game={G,bossAlive,breakBlock,detachChip,sellValue,refreshShop,renderShop,reset,CARDS,count,ballCount,ballDmg,coinMult,wallHit,spawnRow,spawnBoss,endTurn,hitBlock,cardPrice,buildOffers,bossGeom,checkSupport,checkLoss,critChance,pierceChance,baseHpAt,newBlock,ballPackPrice,rerollPrice,openShop,update,fire,resize,bx,by,tableClearBonus,tableQuotaFor,beginTable,enterCashout,computeCashoutTally,loadMeta,saveMeta,clearMeta,isUnlocked,checkAchievements,LOCKED_JOKERS,tableName,pickOffer,storageGet,storageSet,META_KEY,LEGACY_META_KEY,advanceToNextTable,effectiveDifficultyRound,analyzeSupport,cachedSupportAnalysis,completeVolley,spawnBall,geometrySnapshot,aimWithinBoard,startVolley,settleVolley,openLastVolley,closeLastVolley,generateGoals,evaluateGoals,moveBall,syncDepth,ICON_GRIDS,PAL,iconURI,renderGoals};"
 );
 assert.notEqual(instrumented, scriptMatch[1], "game script test hook was installed");
 vm.runInNewContext(instrumented, sandbox);
@@ -76,6 +76,7 @@ const {
   isUnlocked, checkAchievements, LOCKED_JOKERS, tableName, pickOffer, storageGet, storageSet, META_KEY, LEGACY_META_KEY, advanceToNextTable,
   effectiveDifficultyRound, analyzeSupport, cachedSupportAnalysis, completeVolley, spawnBall, geometrySnapshot, aimWithinBoard,
   tableQuotaFor, startVolley, settleVolley, openLastVolley, closeLastVolley, generateGoals, evaluateGoals, detachChip, moveBall, syncDepth,
+  ICON_GRIDS, PAL, iconURI, renderGoals,
 } = sandbox.__game;
 
 resize();
@@ -577,15 +578,14 @@ for (const id of cardIds) assert.ok(validRar.has(CARDS[id].rar), `${id} has a va
   assert.equal(G.particles.filter(p => p.kind === "faller").length, 3, "3 faller particles spawned");
 }
 
-/* ---------- roster integrity: unique ids/names/icons, every id referenced in a hook ---------- */
+/* ---------- roster integrity: unique ids/names, every id referenced in a hook ---------- */
 {
-  const seenNames = new Set(), seenIcons = new Set();
+  const seenNames = new Set();
   for (const id of cardIds) {
     const c = CARDS[id];
     assert.ok(!seenNames.has(c.nm), `duplicate joker name: ${c.nm}`);
     seenNames.add(c.nm);
-    assert.ok(!seenIcons.has(c.ic), `duplicate joker icon: ${c.ic} (${id})`);
-    seenIcons.add(c.ic);
+    assert.ok(c.ic && typeof c.ic === "string" && c.ic.length > 0, `${id} has an emoji fallback icon`);
     assert.ok(c.ds && typeof c.ds === "string" && c.ds.length > 0, `${id} has a description`);
   }
   const legendaryIds = cardIds.filter(id => CARDS[id].rar === "legendary");
@@ -597,6 +597,42 @@ for (const id of cardIds) assert.ok(validRar.has(CARDS[id].rar), `${id} has a va
     const matches = scriptMatch[1].match(re) || [];
     assert.ok(matches.length >= 1, `joker id "${id}" is never referenced by a hook`);
   }
+}
+
+/* ---------- ICON_GRIDS integrity: every joker + UI icon name present, 12x12, legal chars, unique ---------- */
+{
+  const UI_ICON_NAMES = ["goal_target", "goal_sweep", "goal_pinball", "goal_cut", "goal_bank", "goal_hit",
+    "skull", "spade", "ballpack", "mute_on", "mute_off", "pickup"];
+  const legalChars = new Set("kcgdrRAbsPpweu.".split(""));
+  const seenGrids = new Map();
+  for (const id of [...cardIds, ...UI_ICON_NAMES]) {
+    const grid = ICON_GRIDS[id];
+    assert.ok(Array.isArray(grid), `ICON_GRIDS has an entry for "${id}"`);
+    assert.equal(grid.length, 12, `"${id}" icon grid has 12 rows`);
+    for (const row of grid) {
+      assert.equal(row.length, 12, `"${id}" icon grid row has 12 columns`);
+      for (const ch of row) assert.ok(legalChars.has(ch), `"${id}" icon grid uses only legal PAL characters (got "${ch}")`);
+    }
+    const sig = JSON.stringify(grid);
+    assert.ok(!seenGrids.has(sig), `icon grid for "${id}" duplicates the grid for "${seenGrids.get(sig)}"`);
+    seenGrids.set(sig, id);
+  }
+  assert.ok(PAL && typeof PAL === "object" && PAL.k, "PAL palette is exported and has an ink color");
+}
+
+/* ---------- iconURI: guarded, returns null (never throws) in the sandbox ---------- */
+{
+  assert.doesNotThrow(() => iconURI("heavy", 36, "#d64550"), "iconURI never throws even without a real canvas");
+  assert.equal(iconURI("heavy", 36, "#d64550"), null, "iconURI returns null in the mocked DOM sandbox");
+  assert.equal(iconURI("nonexistent_icon_name", 24), null, "iconURI returns null for an unknown icon name");
+}
+
+/* ---------- renderHand/renderShop/renderGoals still run clean with icon fallback ---------- */
+{
+  Object.assign(G, { jokers: ["heavy", "rapid"], coins: 50, offers: [], shopVisits: 0, jstate: {}, activeGoals: [] });
+  assert.doesNotThrow(() => reset(), "reset() (which calls renderHand()) runs clean with the icon system installed");
+  assert.doesNotThrow(() => renderShop(), "renderShop() runs clean with the icon system installed");
+  assert.doesNotThrow(() => renderGoals(), "renderGoals() runs clean with the icon system installed");
 }
 
 /* ---------- Wild Card + Doppelganger recursion safety ---------- */

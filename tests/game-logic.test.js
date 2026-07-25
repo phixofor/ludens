@@ -256,7 +256,8 @@ for (const id of cardIds) assert.ok(validRar.has(CARDS[id].rar), `${id} has a va
   assert.equal(boss.gcol, 0, "placement roll 0.3*3=0.9 floors to gcol 0");
   assert.equal(boss.gcols, 5, "boss always spans BOSS_GCOLS=5 columns");
   syncDepth();
-  assert.equal(getElement('depthLine').textContent, 'THE SCISSORS', "boss depth label drops the 'BOSS · ' prefix so it doesn't overlap the score stat");
+  assert.equal(getElement('depthLine').textContent, 'BOSS', "the depth number row flags a boss fight");
+  assert.equal(getElement('depthLabel').textContent, 'THE SCISSORS', "the boss rule moves to the small label row so it survives a narrow HUD");
 }
 
 /* ---------- boss pressure rows during boss fights ---------- */

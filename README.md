@@ -11,9 +11,10 @@ A single-file mobile web game that mashes **Holedown**'s elongated capsule ball 
 - **Drag** anywhere to aim, release to fire elongated capsules that accelerate out of the launcher.
 - **Tap** mid-flight to fast-forward the bounce.
 - Clear the chips before they cross the dashed danger line. **Chips are supported by anchors** — the top row (newest, attached to the ceiling) and the boss (if alive). Break a chip holding up a cluster and the rest **fall off the board**, adding their starting HP to Score while retaining their normal Cash payout. Falling cut chips demolish chips and bosses below them, dealing 25% of their HP as damage (max 4 hits per faller). This is the core skill: aim for the load-bearing block, not the stack above it.
-- The **shop** opens after rounds 2 and 4, then again after the boss. You hold five jokers positioned at the bottom of the screen in the thumb zone — tap any joker to see its effect. Every shop sells **Ball Packs** for permanent +1 ball ($10 Cash first, +$6 each after).
+- The **shop** opens after rounds 2 and 4, then again after the boss. You hold five jokers positioned at the bottom of the screen in the thumb zone — tap any joker to see its effect. Every shop sells **Ball Packs** for permanent +1 ball (price: $10 + $6p + $2p², where p is the number of Ball Packs purchased). Free ball pickups convert to $8 Cash after six balls collected per run.
 - Every table has six normal rounds, followed by a **boss brick** and overtime pressure rows until it falls. Its armor floors weak hits at 1 damage, so you need damage jokers to punch through before it descends onto you.
 - Breaking or cutting chips retains its normal **Cash** payout and also adds the chip's starting HP to **Score**; actual boss damage adds Score. Three automatic goals (Easy, Medium, Hard) appear at the bottom alongside your jokers with on-board ⌖/row markers; completed goals stack their score multipliers and award separate Cash bounties. Quotas have been raised and chip HP softened to balance score builds against damage builds.
+- Balls scale through a breadth tool with diminishing returns: effective ball count = raw count (up to 6), then +0.5× per ball up to 14, then +0.25× per ball after that. This keeps late-game ball stacking rewarding but prevents explosive runaway scaling.
 - Each volley displays a non-blocking score banner. Tap the score stat to reveal a 'Last volley' breakdown showing direct, cascade, and boss score, completed goals, the stacked multiplier, and Cash bounties.
 
 ## Tables & Win Condition
@@ -71,7 +72,7 @@ Default aim only shows a straight direction ray — Laser Sight is the only way 
 
 When you destroy 3+ chips in a single turn, a pulsing gold **COMBO ×N** appears at the top of the screen, celebrating your momentum. The number rises with each additional chip destroyed that turn. Combined with turn receipts (which show chip-break and cut counts for large turns), combos reward aggressive, synergistic play.
 
-Support links and `CUT N` badges expose load-bearing targets. Impacts use brief hit-stop, damaged chips crack visibly, and cascades fall in a staggered sequence with rising notes. Flight automatically speeds up after 0.9 and 1.8 seconds without a productive hit, resets on impact, and fast-returns balls once the board is safely behind them; tapping still toggles manual 3× speed.
+Support links and `CUT N` badges expose load-bearing targets. Impacts use brief hit-stop, damaged chips show pixel damage, and cascades fall in a staggered sequence with rising notes. Wall bounces trigger audio feedback. Flight automatically speeds up after 0.9 and 1.8 seconds without a productive hit, resets on impact, and fast-returns balls once the board is safely behind them; tapping still toggles manual 3× speed.
 
 ### Bank Shot & wall bounces
 
@@ -139,8 +140,11 @@ The values worth nudging are near the top of the script in `index.html`:
 - `wallHit()` — Bank Shot's per-ball damage cap (+3 per copy) and Toll Booth's per-launch Cash cap ($4)
 - `REWARD` table — block payouts by denomination tier (indexed 0–5 for chips ≤1, ≤3, ≤6, ≤10, ≤16, ∞ HP)
 - `PRICE` / `cardPrice()` / `sellValue()` — rarity-based shop economy (common/uncommon/rare/legendary base prices, growth +1 per shop visit, coupon/pack discounts, 2-chip floor)
+- `ballPackPrice()` — quadratic Ball Pack escalation: `$10 + $6p + $2p²` (where p = packs purchased)
+- `ballCount()` — diminishing returns above 6: `eff = r<=6 ? r : r<=14 ? 6+0.5*(r-6) : 10+0.25*(r-14)` and rounding to integer
+- `spawnBall()` — free-ball conversion to cash after 6 pickups per run (`freeBallsCollected >= 6` awards $8)
+- `TABLE_QUOTAS` — raised for late tables (Table 7: 9500, Table 8: 12000, Overtime: `12000 × 1.35^(n-8)`)
 - `pickRarity()` — shop offer rarity weights (55/32/11/2)
-- `ballCount()` / `spawnBall()` — Ball Pack stacking and ball-spawn mechanics
 - `SPEED` in `resize()` — ball pace
 - `checkSupport()` — anchor adjacency and falling-cluster payout
 

@@ -669,7 +669,7 @@ function abbrev(n){
 }
 const G={ screen:'start', coins:0, turn:1, best:0, jokers:[], blocks:[], balls:[], queue:[], fireTimer:0,
   launchX:null, dir:null, aiming:false, particles:[], floats:[], coinfx:[], destroyedThisTurn:0,
-  timeScale:1, manualSpeed:false, flightIdle:0, hitStop:0, firstReturnX:null, shake:0, shopVisits:0, bonusBalls:0, freeBallsCollected:0, rerollCost:3, offers:[],
+  timeScale:1, manualSpeed:false, hitStop:0, firstReturnX:null, shake:0, shopVisits:0, bonusBalls:0, freeBallsCollected:0, rerollCost:3, offers:[],
   jstate:{}, stats:{broken:0}, bossMod:null, tollThisLaunch:0, _died:false,
   table:1, roundInTable:1, totalVolleys:0, bossVolleys:0, collectionVolleys:0, bossOvertime:false, nextBlockId:1, tstats:{broken:0,cut:0,crits:0}, pendingCashout:null, hasWon:false, bossMod2:null,
   tableScore:0, runScore:0, tableQuota:tableQuotaFor(1), activeGoals:[], volley:null, lastVolley:null, phase:'aim', volleyId:0, bossKilled:false, detachesThisTable:0,
@@ -679,7 +679,7 @@ const G={ screen:'start', coins:0, turn:1, best:0, jokers:[], blocks:[], balls:[
 function reset(){
   if(document.body&&document.body.classList)document.body.classList.remove('pregame');
   Object.assign(G,{coins:0,turn:1,roundInTable:1,totalVolleys:0,bossVolleys:0,collectionVolleys:0,bossOvertime:false,nextBlockId:1,jokers:[],blocks:[],balls:[],queue:[],launchX:boardLeft+boardSize/2,dir:null,aiming:false,
-    particles:[],floats:[],coinfx:[],destroyedThisTurn:0,timeScale:1,manualSpeed:false,flightIdle:0,hitStop:0,firstReturnX:null,fireTimer:0,
+    particles:[],floats:[],coinfx:[],destroyedThisTurn:0,timeScale:1,manualSpeed:false,hitStop:0,firstReturnX:null,fireTimer:0,
     shake:0,shopVisits:0,bonusBalls:0,freeBallsCollected:0,rerollCost:3,offers:[],jstate:{},stats:{broken:0},bossMod:null,tollThisLaunch:0,ballIdx:0,_died:false,
     bossMod2:null,pendingCashout:null,hasWon:false,brokenThisTurn:0,cutThisTurn:0,coinsThisTurn:0,tableScore:0,runScore:0,tableQuota:tableQuotaFor(1),activeGoals:[],volley:null,lastVolley:null,phase:'aim',volleyId:0,bossKilled:false,detachesThisTable:0,
     newUnlocksThisRun:[],bossKillsThisRun:0,launchesThisRun:0,peakCoinsThisRun:0});
@@ -867,7 +867,7 @@ function fire(){
   if(G.screen!=='play'||G.phase!=='aim'||!G.dir||G.balls.length||G.queue.length)return;
   const hr=count('highroller'); if(hr>0){ G.coins=Math.max(0,G.coins-6*hr); syncTop(); }
   const n=ballCount(); G.queue=[]; for(let i=0;i<n;i++)G.queue.push(1);
-  G.fireTimer=0; G.firstReturnX=null; G.destroyedThisTurn=0; G.timeScale=1; G.manualSpeed=false; G.flightIdle=0; G.hitStop=0; G.tollThisLaunch=0; G.ballIdx=0;
+  G.fireTimer=0; G.firstReturnX=null; G.destroyedThisTurn=0; G.timeScale=1; G.manualSpeed=false; G.hitStop=0; G.tollThisLaunch=0; G.ballIdx=0;
   G.brokenThisTurn=0; G.cutThisTurn=0; G.coinsThisTurn=0; startVolley(); G.phase='flight'; sLaunch();
   G.launchesThisRun=(G.launchesThisRun||0)+1; META.lifetime.launches++; markMetaDirty(); checkAchievements({launches:true});
 }
@@ -1129,7 +1129,7 @@ function hitBlock(ball,b){
     if(G.bossMod==='scissors'&&(b.guard||0)>0){ eff=1; b.guard--; }
     if(G.bossMod==='lastcall'&&isLastBall(ball))eff*=3;
     if(G.bossMod==='splitpot'){ const lit=(ball.x<g.cx)===b.litLeft; eff=Math.max(1,Math.round(eff*(lit?2:.5))); b.litLeft=!b.litLeft; }
-    b._hitDamage=eff; const removed=Math.min(b.hp,eff); b.hp-=eff; noteProductive(); impactStop(b.hp<=0?75:(eff>=5?40:24));
+    b._hitDamage=eff; const removed=Math.min(b.hp,eff); b.hp-=eff; impactStop(b.hp<=0?75:(eff>=5?40:24));
     awardScore(removed,'boss',b); // linear-score site: fires per hit, not per kill — score ≈ balls×dmg×hitRate; tune here if boss phases need diminishing returns
     if(G.volley){ G.volley.impacts++; noteEvent('impact',{id:b.id,boss:true}); evaluateGoals('impact',b,ball); } b.squash=0.5; b.flash=1;
     sHit(G.destroyedThisTurn); if(b.hp<=0)breakBlock(b,ball); return true;
@@ -1154,7 +1154,7 @@ function hitBlock(ball,b){
   const cc=critChance(), crit=cc>0 && Math.random()<cc;
   if(crit){ dmg*=2; critFlash(cx0,cy0); jokerProc('headhunter'); G.tstats.crits=(G.tstats.crits||0)+1; }
   else if(count('warhead')>0){ dmg=Math.max(1,dmg-1*count('warhead')); jokerProc('warhead'); }
-  b._hpBefore=b.hp; b._hitDamage=dmg; b.hp-=dmg; noteProductive(); impactStop(b.hp<=0?40:(dmg>=5||crit?40:24)); if(G.volley){ G.volley.impacts++; noteEvent('impact',{id:b.id}); evaluateGoals('impact',b,ball); } b.squash=1; b.flash=1; sHit(G.destroyedThisTurn);
+  b._hpBefore=b.hp; b._hitDamage=dmg; b.hp-=dmg; impactStop(b.hp<=0?40:(dmg>=5||crit?40:24)); if(G.volley){ G.volley.impacts++; noteEvent('impact',{id:b.id}); evaluateGoals('impact',b,ball); } b.squash=1; b.flash=1; sHit(G.destroyedThisTurn);
   if(crit && count('headhunter')>0 && b.hp>0 && b.hp<=3) b.hp=0;
   if(bruise){ b.hp=0; jokerProc('bruiser'); }
   b._crit=crit;
@@ -1266,15 +1266,12 @@ if(scoreStatEl&&scoreStatEl.addEventListener)scoreStatEl.addEventListener('point
 let last=performance.now();
 function loop(now){ let dt=(now-last)/1000; last=now; if(dt>0.05)dt=0.05; update(dt); draw(); requestAnimationFrame(loop); }
 function impactStop(ms){ if(!reducedMotion.matches)G.hitStop=Math.max(G.hitStop||0,ms/1000); }
-function noteProductive(){ G.flightIdle=0; if(!G.manualSpeed)G.timeScale=1; }
 function update(dt){
   for(const b of G.blocks){ b.dispRow+=(b.row-b.dispRow)*Math.min(1,dt*9);
     if(b.squash>0)b.squash=Math.max(0,b.squash-dt*6); if(b.flash>0)b.flash=Math.max(0,b.flash-dt*7); }
   if(G.blocks.some(b=>b.dead))G.blocks=G.blocks.filter(b=>!b.dead);
   if(G._died){ G._died=false; let guard=0; while(checkSupport()&&guard++<40){} }
   if(G.screen==='play'){
-    if(G.balls.length||G.queue.length){ G.flightIdle=(G.flightIdle||0)+dt; if(!G.manualSpeed)G.timeScale=G.flightIdle>=1.8?3:G.flightIdle>=.9?1.75:1; }
-    if(G.queue.length===0&&G.balls.length&&G.balls.every(b=>b.vy>0&&b.y>playTop+SAFE_ROWS*cellH))G.timeScale=6;
     const paused=G.hitStop>0; if(paused)G.hitStop=Math.max(0,G.hitStop-dt);
     const sdt=paused?0:dt*G.timeScale;
     if(G.queue.length){ G.fireTimer-=sdt; if(G.fireTimer<=0){ spawnBall(G.queue.length===1); G.queue.shift(); G.fireTimer=0.055; } }
@@ -1282,7 +1279,7 @@ function update(dt){
     const before=G.balls.length; G.balls=G.balls.filter(b=>!b._collected);
     if(before>0 && G.balls.length===0 && G.queue.length===0){
       if(G.firstReturnX!=null)G.launchX=Math.max(boardLeft+launchR,Math.min(boardRight-launchR,G.firstReturnX));
-      G.timeScale=1; G.manualSpeed=false; G.flightIdle=0;
+      G.timeScale=1; G.manualSpeed=false;
       let guard=0; while(checkSupport()&&guard++<40){}
       settleVolley();
     }
@@ -1644,7 +1641,7 @@ function aimWithinBoard(x,r){ return x>=boardLeft+r&&x<=boardRight-r; }
 /* ---------- input ---------- */
 function pos(e){ const r=cv.getBoundingClientRect(); return {x:e.clientX-r.left,y:e.clientY-r.top}; }
 function down(e){ if(tipConsumeNextDown){ tipConsumeNextDown=false; return; } initAudio(); if(G.screen!=='play')return; e.preventDefault();
-  if(G.balls.length||G.queue.length){ G.manualSpeed=!G.manualSpeed; G.timeScale=G.manualSpeed?3:1; G.flightIdle=0; return; }
+  if(G.balls.length||G.queue.length){ G.manualSpeed=!G.manualSpeed; G.timeScale=G.manualSpeed?3:1; return; }
   G.aiming=true; G.activePointer=e.pointerId; if(cv.setPointerCapture)cv.setPointerCapture(e.pointerId); setAim(pos(e)); }
 function move(e){ if(!G.aiming||e.pointerId!==G.activePointer)return; e.preventDefault(); setAim(pos(e)); }
 function up(e){ if(!G.aiming||e.pointerId!==G.activePointer)return; G.aiming=false; if(cv.releasePointerCapture)try{cv.releasePointerCapture(e.pointerId);}catch(_){} G.activePointer=null; fire(); }

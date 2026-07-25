@@ -848,13 +848,13 @@ assert.ok(Object.values(CARDS).every(c=>Array.isArray(c.tags)&&c.tags.length),'a
   assert.equal(boss.hp,88,'Last Call triples the final ball damage');
 }
 
-/* ---------- hit-stop freezes simulation and adaptive speed removes dead air ---------- */
+/* ---------- hit-stop freezes simulation; speed is manual-only ---------- */
 {
-  Object.assign(G,{screen:'play',blocks:[],balls:[{x:10,y:10,vx:100,vy:100,r:3}],queue:[],particles:[],floats:[],coinfx:[],hitStop:.02,timeScale:1,manualSpeed:false,flightIdle:0});
+  Object.assign(G,{screen:'play',blocks:[],balls:[{x:10,y:10,vx:100,vy:100,r:3}],queue:[],particles:[],floats:[],coinfx:[],hitStop:.02,timeScale:1,manualSpeed:false});
   update(.01); assert.equal(G.balls[0].x,10,'hit-stop does not re-run collision or movement at zero delta');
-  Object.assign(G,{balls:[],queue:[1],fireTimer:99,hitStop:0,flightIdle:0,timeScale:1,manualSpeed:false});
-  update(.91); assert.equal(G.timeScale,1.75,'flight accelerates after 0.9 seconds without a productive hit');
-  update(.9); assert.equal(G.timeScale,3,'flight accelerates again after 1.8 seconds of dead air');
+  Object.assign(G,{balls:[],queue:[1],fireTimer:99,hitStop:0,timeScale:1,manualSpeed:false});
+  update(.91); assert.equal(G.timeScale,1,'flight never auto-accelerates: speed is manual-only');
+  update(.9); assert.equal(G.timeScale,1,'long dead air still does not change the speed by itself');
   G.queue=[]; G.screen='start';
 }
 

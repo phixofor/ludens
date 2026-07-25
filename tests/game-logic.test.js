@@ -62,21 +62,24 @@ sandbox.globalThis = sandbox;
 
 const instrumented = scriptMatch[1].replace(
   "resize(); renderHand(); requestAnimationFrame(loop);",
-  "globalThis.__game={G,bossAlive,breakBlock,detachChip,sellValue,refreshShop,renderShop,reset,CARDS,count,ballCount,ballDmg,coinMult,wallHit,spawnRow,spawnBoss,endTurn,hitBlock,cardPrice,buildOffers,bossGeom,checkSupport,checkLoss,critChance,pierceChance,baseHpAt,newBlock,ballPackPrice,rerollPrice,openShop,update,fire,resize,bx,by,tableClearBonus,tableQuotaFor,beginTable,enterCashout,computeCashoutTally,loadMeta,saveMeta,clearMeta,isUnlocked,checkAchievements,LOCKED_JOKERS,tableName,pickOffer,storageGet,storageSet,META_KEY,LEGACY_META_KEY,advanceToNextTable,effectiveDifficultyRound,analyzeSupport,cachedSupportAnalysis,completeVolley,spawnBall,geometrySnapshot,aimWithinBoard,startVolley,settleVolley,openLastVolley,closeLastVolley,generateGoals,evaluateGoals,moveBall,syncDepth,ICON_GRIDS,PAL,iconURI,renderGoals,rawCount,openJokerTip,closeJokerTip,down,onDocPointerDownForTip};"
+  "globalThis.__game={G,bossAlive,breakBlock,detachChip,sellValue,refreshShop,renderShop,reset,CARDS,count,ballCount,rawBallCount,ballDmg,coinMult,wallHit,spawnRow,spawnBoss,endTurn,hitBlock,cardPrice,buildOffers,bossGeom,checkSupport,checkLoss,critChance,pierceChance,baseHpAt,newBlock,ballPackPrice,rerollPrice,openShop,update,fire,resize,bx,by,tableClearBonus,tableQuotaFor,beginTable,enterCashout,computeCashoutTally,loadMeta,saveMeta,clearMeta,isUnlocked,checkAchievements,LOCKED_JOKERS,tableName,pickOffer,storageGet,storageSet,META_KEY,LEGACY_META_KEY,advanceToNextTable,effectiveDifficultyRound,analyzeSupport,cachedSupportAnalysis,completeVolley,spawnBall,geometrySnapshot,aimWithinBoard,startVolley,settleVolley,openLastVolley,closeLastVolley,generateGoals,evaluateGoals,moveBall,syncDepth,ICON_GRIDS,PAL,iconURI,renderGoals,rawCount,openJokerTip,closeJokerTip,down,onDocPointerDownForTip,abbrev,renderHand,getJokerEls:()=>jokerEls,bossStateLabel,liveBoardBlocks,chipWearBucket,getMeta:()=>META,markMetaDirty,flushMeta,getMetaDirty:()=>metaDirty,getUnlockToastQueue:()=>unlockToastQueue,unlock,showUnlockToast,resetUnlockToastState:()=>{unlockToastQueue.length=0;unlockToastBusy=false;}};"
 );
 assert.notEqual(instrumented, scriptMatch[1], "game script test hook was installed");
 vm.runInNewContext(instrumented, sandbox);
 
 const {
   G, bossAlive, breakBlock, refreshShop, renderShop, reset,
-  CARDS, count, ballCount, ballDmg, coinMult, wallHit,
+  CARDS, count, ballCount, rawBallCount, ballDmg, coinMult, wallHit,
   spawnRow, spawnBoss, endTurn, hitBlock, cardPrice, buildOffers, bossGeom, checkSupport, checkLoss,
   critChance, pierceChance, baseHpAt, newBlock, ballPackPrice, rerollPrice, openShop, update, fire, resize, bx, by,
   tableClearBonus, beginTable, enterCashout, computeCashoutTally, loadMeta, saveMeta, clearMeta,
   isUnlocked, checkAchievements, LOCKED_JOKERS, tableName, pickOffer, storageGet, storageSet, META_KEY, LEGACY_META_KEY, advanceToNextTable,
   effectiveDifficultyRound, analyzeSupport, cachedSupportAnalysis, completeVolley, spawnBall, geometrySnapshot, aimWithinBoard,
   tableQuotaFor, startVolley, settleVolley, openLastVolley, closeLastVolley, generateGoals, evaluateGoals, detachChip, moveBall, syncDepth,
-  ICON_GRIDS, PAL, iconURI, renderGoals, rawCount, openJokerTip, closeJokerTip, down, onDocPointerDownForTip,
+  ICON_GRIDS, PAL, iconURI, renderGoals, rawCount, openJokerTip, closeJokerTip, down, onDocPointerDownForTip, abbrev,
+  renderHand, getJokerEls, bossStateLabel, liveBoardBlocks,
+  chipWearBucket, getMeta, markMetaDirty, flushMeta, getMetaDirty, getUnlockToastQueue, unlock,
+  showUnlockToast, resetUnlockToastState,
 } = sandbox.__game;
 
 resize();
@@ -300,6 +303,32 @@ for (const id of cardIds) assert.ok(validRar.has(CARDS[id].rar), `${id} has a va
   Object.assign(G, { jokers: ["skeleton", "skeleton"] });
   hitBlock(ball3, b3);
   assert.equal(b3.hp, 100 - 10, "armor fully negated (3 <= 2*2) -> full ball dmg through");
+}
+
+/* ---------- Free ball pickups: cap at 6, then convert to +8 cash ---------- */
+{
+  Object.assign(G, { jokers: [], bonusBalls: 0, freeBallsCollected: 0, coins: 0, particles: [], floats: [], coinfx: [] });
+  function pickupOnce() {
+    const b = newBlock(0, 0, 1, 'ball', 1, 1);
+    const ball = { x: bx(b), y: by(b), vx: 0, vy: 0, r: 5 };
+    hitBlock(ball, b);
+    return b;
+  }
+  for (let i = 0; i < 6; i++) {
+    const before = G.bonusBalls;
+    const b = pickupOnce();
+    assert.ok(b.dead, "pickup #" + (i + 1) + " pops");
+    assert.equal(G.bonusBalls, before + 1, "pickup #" + (i + 1) + " (of first 6) grants a ball");
+  }
+  assert.equal(G.freeBallsCollected, 6, "6 free balls collected");
+  assert.equal(G.coins, 0, "no cash awarded yet");
+  const bonusBallsBefore = G.bonusBalls;
+  const coinsBefore = G.coins;
+  const b7 = pickupOnce();
+  assert.ok(b7.dead, "7th pickup still pops");
+  assert.equal(G.bonusBalls, bonusBallsBefore, "7th pickup no longer grants a ball");
+  assert.equal(G.coins, coinsBefore + 8, "7th pickup instead pays +8 cash");
+  assert.equal(G.freeBallsCollected, 7);
 }
 
 /* ---------- Loan Shark drain never goes below 0 ---------- */
@@ -564,28 +593,42 @@ for (const id of cardIds) assert.ok(validRar.has(CARDS[id].rar), `${id} has a va
   Object.assign(G, { jstate: {} });
   assert.equal(ballPackPrice(), 10, "first ball pack costs 10");
   Object.assign(G, { jstate: { ballPacks: 1 } });
-  assert.equal(ballPackPrice(), 16, "second ball pack costs 16");
+  assert.equal(ballPackPrice(), 18, "second ball pack costs 18 (10+6p+2p^2)");
   Object.assign(G, { jstate: { ballPacks: 2 } });
-  assert.equal(ballPackPrice(), 22, "third ball pack costs 22");
+  assert.equal(ballPackPrice(), 30, "third ball pack costs 30 (10+6p+2p^2)");
 
   Object.assign(G, { jokers: [], bonusBalls: 0 });
   const baseBalls = ballCount();
-  Object.assign(G, { coins: 20, offers: [], jstate: {}, bonusBalls: 0 });
+  // coins:17 affords the first pack (10) but not the second (18) -- keeps the
+  // "insufficient chips" assertion below a genuinely refused purchase now that
+  // the quadratic curve makes pack 2 cost 18 instead of the old 16.
+  Object.assign(G, { coins: 17, offers: [], jstate: {}, bonusBalls: 0 });
   renderShop();
   const shopCardsEl = getElement("shopCards");
   const bpCard = shopCardsEl.children[shopCardsEl.children.length - 1];
   bpCard.onclick();
-  assert.equal(G.coins, 10, "buying the first ball pack costs 10 chips");
+  assert.equal(G.coins, 7, "buying the first ball pack costs 10 chips");
   assert.equal(G.jstate.ballPacks, 1);
   assert.equal(G.bonusBalls, 1);
   assert.equal(ballCount(), baseBalls + 1, "bonusBalls grants +1 ball permanently");
   bpCard.onclick();
-  assert.equal(G.coins, 10, "insufficient chips (price now 16): purchase is a no-op");
+  assert.equal(G.coins, 7, "insufficient chips (price now 18): purchase is a no-op");
   assert.equal(G.jstate.ballPacks, 1, "no second purchase happened");
-  Object.assign(G, { coins: 16 });
+  Object.assign(G, { coins: 18 });
   bpCard.onclick();
   assert.equal(G.jstate.ballPacks, 2, "second purchase succeeds once affordable");
   assert.equal(G.bonusBalls, 2);
+}
+
+/* ---------- diminishing ball-count curve above raw 6 ---------- */
+{
+  Object.assign(G, { jokers: [], jstate: {} });
+  const cases = [[4,4],[6,6],[8,7],[10,8],[12,9],[15,10],[20,12],[25,13],[30,14],[40,17],[45,18]];
+  for (const [raw, expected] of cases) {
+    Object.assign(G, { bonusBalls: raw - 4 });
+    assert.equal(rawBallCount(), raw, "rawBallCount matches raw " + raw);
+    assert.equal(ballCount(), expected, "bracketed ballCount for raw " + raw + " is " + expected);
+  }
 }
 
 /* ---------- interest divisor 8 ---------- */
@@ -904,7 +947,7 @@ assert.ok(Object.values(CARDS).every(c=>Array.isArray(c.tags)&&c.tags.length),'a
 {
   clearMeta();
   const fresh = loadMeta();
-  const defaultShape = JSON.stringify({ v: 2, bestTable: 0, bestTurn: 0, bestCoins: 0,
+  const defaultShape = JSON.stringify({ v: 2, bestTable: 0, bestTurn: 0, bestCoins: 0, muted: false,
     lifetime: { broken: 0, launches: 0, bossKills: 0 }, unlocked: {} });
   assert.equal(JSON.stringify(fresh), defaultShape, "clearMeta resets to defaults");
 
@@ -1026,7 +1069,7 @@ assert.ok(Object.values(CARDS).every(c=>Array.isArray(c.tags)&&c.tags.length),'a
   Object.assign(G,{screen:'play',roundInTable:6,totalVolleys:5,turn:6,bossOvertime:false,blocks:[newBlock(0,1,1,'chip',1,1)],jokers:[],coins:0,floats:[],coinfx:[]});
   const priorRow=G.blocks[0].row;
   withRandomSeq([0.1],()=>endTurn());
-  assert.equal(G.blocks[0].row,priorRow+1,"transition into the boss round descends existing blocks once");
+  assert.equal(G.blocks[0].row,priorRow+2,"transition into the boss round descends existing blocks twice so the boss (row 0, rowSpan 2) never overlaps them");
   assert.equal(G.bossOvertime,true,"round 6 transitions into boss overtime");
   assert.equal(G.blocks.filter(block=>block.boss).length,1,"round 6 spawns exactly one boss");
 
@@ -1045,8 +1088,8 @@ assert.ok(Object.values(CARDS).every(c=>Array.isArray(c.tags)&&c.tags.length),'a
 
 /* ---------- Phase 2: score ledger, goals, receipts, collection overtime ---------- */
 {
-  assert.deepEqual([1,2,3,4,5,6,7,8].map(tableQuotaFor), [375,1125,2250,3750,5250,7000,9000,10750]);
-  assert.equal(tableQuotaFor(9), Math.round(10750*1.35), "overtime quota scales from table 8");
+  assert.deepEqual([1,2,3,4,5,6,7,8].map(tableQuotaFor), [375,1125,2250,3750,5250,7000,9500,12000]);
+  assert.equal(tableQuotaFor(9), Math.round(12000*1.35), "overtime quota scales from table 8");
   reset();
   assert.equal(G.activeGoals.length, 3, "every board starts with exactly three goals");
   assert.equal(JSON.stringify(G.activeGoals.map(g=>[g.tier,g.bonus,g.cash])), JSON.stringify([['easy',.25,1],['medium',.5,2],['hard',.75,3]]));
@@ -1198,17 +1241,179 @@ assert.ok(Object.values(CARDS).every(c=>Array.isArray(c.tags)&&c.tags.length),'a
   closeJokerTip();
 }
 {
-  // dismissing tap must not start aiming on the very next canvas pointerdown
+  // dismissing tap must not start aiming on the very next canvas pointerdown,
+  // but only when the dismissing tap actually landed on the canvas
   Object.assign(G,{screen:'play',jokers:['thrifty'],balls:[],queue:[],aiming:false});
   const fakeEvent={ preventDefault(){}, clientX:10, clientY:10, pointerId:1 };
   openJokerTip('thrifty');
-  onDocPointerDownForTip();
+  onDocPointerDownForTip({target:canvas});
   assert.equal(getElement('jokerTip').classList.contains('show'),false,'the document-level dismiss handler closes the tip');
   down(fakeEvent);
   assert.equal(G.aiming,false,'the pointerdown that dismissed the tip is consumed and does not start aiming');
   down(fakeEvent);
   assert.equal(G.aiming,true,'the following pointerdown behaves normally and starts aiming');
   G.aiming=false; G.activePointer=null;
+}
+{
+  // a dismiss that lands on a non-canvas element (e.g. the score stat) must not arm
+  // tipConsumeNextDown -- it must not silently swallow the next real canvas tap
+  Object.assign(G,{screen:'play',jokers:['thrifty'],balls:[],queue:[],aiming:false});
+  const fakeEvent={ preventDefault(){}, clientX:10, clientY:10, pointerId:2 };
+  openJokerTip('thrifty');
+  onDocPointerDownForTip({target:getElement('score')});
+  assert.equal(getElement('jokerTip').classList.contains('show'),false,'tapping a non-canvas element still closes the tip');
+  down(fakeEvent);
+  assert.equal(G.aiming,true,'a non-canvas dismiss does not arm tipConsumeNextDown, so the next canvas tap aims immediately');
+  G.aiming=false; G.activePointer=null;
+}
+{
+  // a second tap on the same joker card must close its tip, not re-open it -- the document
+  // capture listener nulls jokerTipId before the card's own handler runs
+  Object.assign(G,{jokers:['thrifty']});
+  renderHand();
+  const card=getJokerEls()['thrifty'];
+  openJokerTip('thrifty');
+  assert.equal(getElement('jokerTip').classList.contains('show'),true,'tip opens on the first tap');
+  const evt={type:'pointerdown',target:card,stopPropagation(){}};
+  onDocPointerDownForTip(evt); // document capture phase: fires before the card's own listener
+  card.dispatchEvent(evt); // card's own pointerdown listener (target phase), same event
+  assert.equal(getElement('jokerTip').classList.contains('show'),false,'a second tap on the same card closes the tip instead of reopening it');
+}
+
+/* ---------- draw()'s render loop must skip dead blocks (no final frame over their own explosion) ---------- */
+{
+  Object.assign(G, { blocks: [
+    { id: 'alive', dead: false, boss: false, type: 'chip' },
+    { id: 'dying', dead: true, boss: false, type: 'chip', hp: -3 },
+    { id: 'deadboss', dead: true, boss: true },
+  ] });
+  assert.deepEqual(liveBoardBlocks().map(b => b.id), ['alive'], "liveBoardBlocks excludes dead chips and a dead boss from the render loop");
+}
+
+/* ---------- boss state label never prints the literal string "undefined" ---------- */
+{
+  const boss = { boss: true, dead: false, hp: 10, maxhp: 10, armor: 1, sealed: false, guard: 0 };
+  Object.assign(G, { bossMod: null });
+  assert.equal(bossStateLabel(boss), '', "an unset boss modifier composes to an empty label, never the string 'undefined'");
+  assert.ok(!bossStateLabel(boss).includes('undefined'), "the composed boss state label never contains 'undefined'");
+  Object.assign(G, { bossMod: 'vault' });
+  boss.sealed = true;
+  assert.equal(bossStateLabel(boss), 'SEALED', "a sealed vault boss still shows SEALED");
+  Object.assign(G, { bossMod: 'scissors' });
+  boss.guard = 2;
+  assert.equal(bossStateLabel(boss), 'GUARD ×2', "a guarded scissors boss still shows its guard count");
+
+  // syncDepth's DOM label must also never leak "undefined"
+  Object.assign(G, { bossMod: null, blocks: [{ boss: true, dead: false, hp: 10, maxhp: 10 }] });
+  syncDepth();
+  assert.ok(!getElement('depthLine').textContent.includes('undefined'), "syncDepth's boss label never contains 'undefined' for an unset modifier");
+}
+
+/* ---------- abbrev(): cash/score HUD number shortening ---------- */
+{
+  assert.equal(abbrev(999), "999", "abbrev leaves sub-10000 numbers untouched");
+  assert.equal(abbrev(1000), "1000");
+  assert.equal(abbrev(9999), "9999");
+  assert.equal(abbrev(10000), "10k", "abbrev drops a trailing .0 at the 10000 boundary");
+  assert.equal(abbrev(12502), "12.5k", "abbrev keeps one decimal when it is non-zero");
+}
+
+/* ---------- initial score label matches tableQuotaFor(1) ---------- */
+{
+  const scoreMatch = rootHtml.match(/<b id="score">([^<]*)<\/b>/);
+  assert.ok(scoreMatch, "the score stat exists in the static markup");
+  assert.equal(scoreMatch[1], "0/" + tableQuotaFor(1), "the hardcoded initial score label agrees with tableQuotaFor(1)");
+}
+
+/* ---------- chip wear bucketing (drives the cached-sprite key: 0/1/2 from 1-hp/maxhp) ---------- */
+{
+  assert.equal(chipWearBucket({ hp: 10, maxhp: 10 }), 0, "an undamaged chip is wear bucket 0");
+  assert.equal(chipWearBucket({ hp: 7, maxhp: 10 }), 0, "30% wear is still bucket 0 (below the .33 threshold)");
+  assert.equal(chipWearBucket({ hp: 6, maxhp: 10 }), 1, "40% wear is bucket 1");
+  assert.equal(chipWearBucket({ hp: 4, maxhp: 10 }), 1, "60% wear is still bucket 1 (below the .66 threshold)");
+  assert.equal(chipWearBucket({ hp: 3, maxhp: 10 }), 2, "70% wear is bucket 2");
+  assert.equal(chipWearBucket({ hp: 0, maxhp: 10 }), 2, "a fully-broken chip is bucket 2");
+}
+
+/* ---------- saveMeta dirty-flag + flushMeta: a cascade of stat mutations does not hit storage until flushed ---------- */
+{
+  clearMeta();
+  assert.equal(getMetaDirty(), false, "clearMeta leaves the dirty flag clean");
+  getMeta().lifetime.broken = 12345; markMetaDirty();
+  assert.equal(getMetaDirty(), true, "markMetaDirty raises the dirty flag");
+  assert.equal(JSON.parse(storageGet(META_KEY)).lifetime.broken, 0, "a dirty mutation is not written to storage before flushMeta runs");
+  flushMeta();
+  assert.equal(getMetaDirty(), false, "flushMeta clears the dirty flag");
+  assert.equal(JSON.parse(storageGet(META_KEY)).lifetime.broken, 12345, "flushMeta writes the pending mutation");
+  flushMeta(); // idempotent: no pending write, must not throw or re-serialize needlessly
+  assert.equal(getMetaDirty(), false, "a second flushMeta with nothing dirty is a no-op");
+  clearMeta();
+}
+
+/* ---------- unlock() stays immediate-safe: it flushes right away even if other mutations are still dirty ---------- */
+{
+  clearMeta();
+  getMeta().lifetime.broken = 77; markMetaDirty();
+  unlock('twins');
+  assert.equal(getMetaDirty(), false, "unlock() flushes immediately, clearing any pending dirty state");
+  const stored = JSON.parse(storageGet(META_KEY));
+  assert.equal(stored.unlocked.twins, true, "unlock persists its own change immediately");
+  assert.equal(stored.lifetime.broken, 77, "unlock's immediate flush also carries any other pending dirty mutation");
+  clearMeta();
+}
+
+/* ---------- resize(): unchanged W/H/dpr is a no-op ---------- */
+{
+  stage.clientWidth = 350; stage.clientHeight = 600; resize();
+  const before = G.launchX;
+  resize(); // dimensions unchanged: must early-return, leaving geometry bit-identical
+  assert.equal(G.launchX, before, "resize() with unchanged W/H/dpr does not recompute geometry");
+}
+
+/* ---------- wall-bounce feedback: every bounce spawns a flash at the contacted wall ---------- */
+{
+  const geo = geometrySnapshot();
+  Object.assign(G, { jokers: [], particles: [], volley: null });
+  const ball = { x: geo.boardLeft, y: 100, r: geo.ballR, dmg: 1 };
+  wallHit(ball, false);
+  const flashes = G.particles.filter(p => p.kind === 'wallflash');
+  assert.equal(flashes.length, 1, "a wall bounce spawns exactly one wallflash particle");
+  assert.ok(Math.abs(flashes[0].x - geo.boardLeft) < 1e-6, "the flash sits at the contacted wall, not mid-board");
+}
+
+/* ---------- mute persists in META and survives a reload ---------- */
+{
+  clearMeta();
+  assert.equal(loadMeta().muted, false, "a fresh meta record defaults muted to false");
+  storageSet(META_KEY, JSON.stringify({ v: 2, bestTable: 0, bestTurn: 0, bestCoins: 0, muted: true,
+    lifetime: { broken: 0, launches: 0, bossKills: 0 }, unlocked: {} }));
+  assert.equal(loadMeta().muted, true, "loadMeta parses a persisted muted:true flag");
+  clearMeta();
+  const wasMuted = JSON.parse(storageGet(META_KEY)).muted;
+  assert.equal(wasMuted, false);
+  getElement('mute').onclick();
+  assert.equal(JSON.parse(storageGet(META_KEY)).muted, true, "toggling mute flushes the new state to storage immediately");
+  getElement('mute').onclick(); // restore for hygiene
+  clearMeta();
+}
+
+/* ---------- unlock toasts queue instead of overwriting one another ---------- */
+{
+  resetUnlockToastState();
+  showUnlockToast('a'); showUnlockToast('b'); showUnlockToast('c');
+  assert.deepEqual(Array.from(getUnlockToastQueue()), ['b', 'c'], "a toast already showing is not replaced; later unlocks queue behind it");
+  resetUnlockToastState();
+}
+
+/* ---------- glyph purge: no tofu codepoint reaches ctx.fillText or a Silkscreen/Space-Grotesk DOM string ---------- */
+{
+  // The embedded Silkscreen/Space Grotesk subsets were measured to be missing exactly
+  // U+2713(check) U+2316(target) U+25B6(play) U+2660(spade); confirm none of the four
+  // remain anywhere in the game script (the icon-grid pixel art replaced all of their uses).
+  const banned = ['✓', '⌖', '▶', '♠'];
+  for (const ch of banned) {
+    assert.ok(!scriptMatch[1].includes(ch), `script no longer contains the tofu glyph U+${ch.codePointAt(0).toString(16)}`);
+  }
 }
 
 console.log("game logic tests: ok");

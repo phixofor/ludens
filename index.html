@@ -83,6 +83,8 @@ body.danger #view{animation:danger 1s infinite}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
 #graph{width:100%;height:220px;display:block;border-radius:10px;background:#120f0c;margin:10px 0 4px}
 #obit{font-size:15px}
+#end .go{position:sticky;bottom:-6px;box-shadow:0 -10px 16px 4px #1c1813}
+#end #graph{height:150px}
 .how{display:grid;grid-template-columns:auto 1fr;gap:8px 10px;align-items:center;margin:12px 0;font-size:14.5px}
 .how span{font-size:22px;text-align:center}
 .sw{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px}
@@ -192,7 +194,7 @@ body.danger #view{animation:danger 1s infinite}
     <li>Feed pours nutrient back out (Gobbler food); Muck pours waste back out (Mulcher food, Gobbler poison).</li>
     <li>Stone and water squash whoever lives there, and nobody can live on them; Soil erases them for free.</li>
     <li>Your tools never run out, but a fifth of everything you scoop is spilled and gone – so move food when it matters, not for fun.</li>
-    <li>After a couple of years the Nippers raid every summer with a bigger pack: a hungry Nipper eats an adjacent Gobbler.</li>
+    <li>After a couple of years the Nippers raid every summer with a bigger pack, unless the Gobblers are too few to bother: a hungry Nipper eats an adjacent Gobbler.</li>
     <li>Drought: water behaves like soil for a while.</li>
     <li>Flood: water spreads out and washes away nearby nutrient and waste.</li>
     <li>Health is average energy × average age: a mood ring, not a score.</li>
@@ -276,6 +278,7 @@ const CONFIG = {
   HUNT_SEED_RANGE: 9,     // Nipper seeds fly further …
   HUNT_SEED_TRIES: 8,     // … and get several tries to find a spot next to prey
   C_SEEDS: 6,             // number of places the Nippers land
+  C_MIN_PREY: 150,        // no raid in a year when the Gobblers are fewer than this
   C_SEED_CLOVERS: 4,      // clovers per place
 
   // --- Events ---
@@ -288,7 +291,7 @@ const CONFIG = {
 
   // --- Player economy ---
   SCOOP_LOSS: 0.2,        // share of every scoop that is spilled: moving food is the only cost of acting
-  RESERVOIR_MAX: 40, RESERVOIR_START: 20, // one reservoir for nutrient, one for waste
+  RESERVOIR_MAX: 80, RESERVOIR_START: 30, // one reservoir for nutrient, one for waste
   HARVEST_FRAC: 0.5,      // share of a cell's nutrient and waste that Scoop takes
   FERT_AMOUNT: 0.2,       // nutrient (Feed) or waste (Muck) poured per cell
   BRUSH: 2,               // brush radius (cells)
@@ -404,7 +407,7 @@ function stepSim(sim) {
     if (t) sim.out.push({ k: 'year', year });
     if (year >= 2 && rnd() < C.EVENT_CHANCE) sim.pending = { type: rnd() < 0.5 ? 'drought' : 'flood', start: t + Math.floor(YT * (0.12 + 0.6 * rnd())) };
   }
-  if (t % YT === ST) { const year = Math.floor(t / YT) + 1; if (year >= C.C_UNLOCK_YEAR && !sim.pop[2]) seedHunters(sim, year - C.C_UNLOCK_YEAR); } // Nippers raid in summer, when there is prey to spare
+  if (t % YT === ST) { const year = Math.floor(t / YT) + 1; if (year >= C.C_UNLOCK_YEAR && !sim.pop[2] && sim.pop[0] >= C.C_MIN_PREY) seedHunters(sim, year - C.C_UNLOCK_YEAR); } // Nippers raid in summer, when there is prey to spare
   if (t > 0 && t % ST === 0) sim.out.push({ k: 'season', season });
   if (sim.pending) {
     const p = sim.pending;
@@ -596,8 +599,8 @@ const QUIPS = [
 function narrate() {
   const t = sim.tick, [a, b, c] = sim.pop, ST = C.SEASON_TICKS, se = Math.floor(t / ST) % 4, f = (t % ST) / ST;
   if (se === 2 && f > 0.6 && f < 0.63) say('Winter is coming. Scoop now, feed later.');
-  else if (a > 0 && a < 40) once('lowA' + (t / 600 | 0), 'The Gobblers are nearly gone. Feed 🌿 right on top of them – kindly and quickly.');
-  else if (b > 0 && b < 40) once('lowB' + (t / 600 | 0), 'The Mulchers are nearly gone. Muck 💩 right on top of them. Yes, really.');
+  else if (a > 0 && a < 100 && a <= b) once('lowA' + (t / 600 | 0), 'The Gobblers are running low. Save the rarer species first: Feed 🌿 right on top of them.');
+  else if (b > 0 && b < 100 && b < a) once('lowB' + (t / 600 | 0), 'The Mulchers are running low. Save the rarer species first: Muck 💩 right on top of them.');
   else if (t === 25) once('tip1', 'Tip: dim creatures are hungry. Feed 🌿 the yellow ones, Muck 💩 the blue ones.');
   else if (t === 70) once('tip2', 'Tip: Scoop 🧺 where the ground glows green or purple and nobody lives. It grows back.');
   else if (a > 2500) once('bigA' + (t / 600 | 0), 'The Gobblers celebrate a record population. That usually ends one way.');
@@ -664,7 +667,7 @@ function updateHud() {
   $('nextLbl').textContent = SEASONS[(se + 1) % 4] + ' in ' + Math.ceil((ST - t % ST) / (C.TICKS_PER_SEC * speed)) + ' s';
   $('healthVal').textContent = Math.round(sim.health); $('healthBar').style.width = Math.min(100, sim.health) + '%';
   $('popA').textContent = 'Gobblers ' + sim.pop[0]; $('popB').textContent = 'Mulchers ' + sim.pop[1];
-  $('popC').textContent = sim.cActive ? (sim.pop[2] ? 'Nippers ' + sim.pop[2] : 'Nippers gone (for now)') : 'Nippers 🔒 year ' + C.C_UNLOCK_YEAR;
+  $('popC').textContent = sim.cActive ? (sim.pop[2] ? 'Nippers ' + sim.pop[2] : 'Nippers gone (for now)') : t / YT + 1 >= C.C_UNLOCK_YEAR ? 'Nippers: too little prey' : 'Nippers 🔒 year ' + C.C_UNLOCK_YEAR;
   document.body.classList.toggle('danger', sim.tick > 5 && !sim.over && Math.min(sim.pop[0], sim.pop[1]) < 40);
   const rec = pb && t > pb, el = $('pb'); el.className = rec ? 'new' : '';
   el.textContent = rec ? '🏆 New record!' : pb ? '🏆 Record: year ' + (Math.floor(pb / YT) + 1) + ', ' + SEASONS[Math.floor(pb % YT / ST)].toLowerCase() : '';
@@ -787,7 +790,7 @@ const WORLDS = [ // [name, intro line, config changes, lifetime years survived (
   ['Rocky', 'Boulder country. Less room for everyone, including you.', { STONES: 26 }, 5],
   ['Wetlands', 'Three streams. Food travels fast here – and floods travel faster.', { STREAMS: 3 }, 9],
   ['Compost heap', 'This meadow starts knee-deep in waste. The Mulchers call it paradise.', { START_WASTE_FRAC: 0.75 }, 14],
-  ['Thin soil', 'Poor soil, but someone left you bigger buckets.', { SOIL_RICH: 0.58, RESERVOIR_MAX: 60 }, 20],
+  ['Thin soil', 'Poor soil, but someone left you bigger buckets.', { SOIL_RICH: 0.58, RESERVOIR_MAX: 130 }, 20],
   ['Nipper country', 'The Nippers do not wait for year 3 around here. They come in year 2.', { C_UNLOCK_YEAR: 2 }, 27],
 ];
 const YEAR = CONFIG.SEASON_TICKS * 4;
@@ -831,7 +834,7 @@ const MEDALS = [ // [id, icon, name, how to earn it, earned right now?]
   ['y8', '🥇', 'Eight winters', 'Survive 8 years.', () => sim.tick >= 8 * YEAR],
   ['fed', '🍽', 'Soup kitchen', 'Feed 150 hungry creatures in one run.', () => run.fed >= 150],
   ['goals', '🌟', 'Overachiever', 'Finish 6 goals in one run.', () => run.goals >= 6],
-  ['boom', '🎉', 'Baby boom', 'Have 2800 creatures alive at once.', () => sim.pop[0] + sim.pop[1] >= 2800],
+  ['boom', '🎉', 'Baby boom', 'Have 2000 creatures alive at once after the first spring.', () => sim.tick > 300 && sim.pop[0] + sim.pop[1] >= 2000],
   ['nip', '🦷', 'Pest control', 'Outlast a Nipper raid.', () => run.nipGone],
   ['edge', '😅', 'Close call', 'Drop below 10 of a species, then last another year.', () => run.low > 0 && sim.tick - run.low >= YEAR],
 ];
@@ -849,7 +852,7 @@ function newGoal() {
   const reach = { txt: `Reach ${round(sim.pop[weak] * 1.6 + 30)} ${weak ? 'Mulchers' : 'Gobblers'}`, cur: () => sim.pop[weak], target: round(sim.pop[weak] * 1.6 + 30) };
   const low = round(Math.min(sim.pop[0], sim.pop[1]) * [0.9, 0.8, 0.6, 0.4][se]);
   const hold = { txt: `End ${SEASONS[se].toLowerCase()} with ${low}+ of each`, cur: () => Math.min(sim.pop[0], sim.pop[1]), target: low, atEnd: true };
-  const scoop = { txt: 'Scoop 40 into the reservoirs', cur: () => scooped, target: 40 }, pour = { txt: 'Hand out 30 of Feed or Muck', cur: () => poured, target: 30 };
+  const scoop = { txt: 'Scoop 60 into the reservoirs', cur: () => scooped, target: 60 }, pour = { txt: 'Hand out 50 of Feed or Muck', cur: () => poured, target: 50 };
   goal = sim.tick ? pick([[reach, scoop], [scoop, hold], [hold, scoop, pour], [hold, pour]][se]) : scoop; // the very first goal teaches scooping
 }
 function checkGoal() {

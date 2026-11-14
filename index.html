@@ -174,9 +174,10 @@ small{color:var(--dim);font-size:11px}
     <li>Feed pours nutrient back out (Gobbler food); Muck pours waste back out (Mulcher food, Gobbler poison).</li>
     <li>Stone and water squash whoever lives there, and nobody can live on them; Soil erases them for free.</li>
     <li>Your tools never run out, but a fifth of everything you scoop is spilled and gone – so move food when it matters, not for fun.</li>
-    <li>From year 3 the Nippers raid every spring with a bigger pack: a hungry Nipper eats an adjacent Gobbler.</li>
+    <li>After a couple of years the Nippers raid every summer with a bigger pack: a hungry Nipper eats an adjacent Gobbler.</li>
     <li>Drought: water behaves like soil for a while.</li>
     <li>Flood: water spreads out and washes away nearby nutrient and waste.</li>
+    <li>Health is average energy × average age: a mood ring, not a score.</li>
     <li>Every new year you pick one gift.</li>
     <li>If the Gobblers or the Mulchers die out, the run is over – your score is how long they lasted.</li>
   </ol>
@@ -235,7 +236,7 @@ const CONFIG = {
 
   // --- Seeds (what lets colonies spread) ---
   SEED_ENERGY: [0.9, 0.9, 0.75], // how full an A, B, C must be to seed
-  SEED_CHANCE: [0.004, 0.004, 0.02], // chance per tick that a full A, B, C shoots a seed
+  SEED_CHANCE: [0.004, 0.004, 0.035], // chance per tick that a full A, B, C shoots a seed
   SEED_RANGE: 6,          // how far a seed flies (cells)
   SEED_FOOD: 0.15,        // food needed in the whole 3×3 landing area
   SEED_SHAPES: [0.7, 0.2], // share of clovers, blinkers (the rest are gliders)
@@ -244,15 +245,15 @@ const CONFIG = {
 
   // --- Nippers (C) ---
   C_UNLOCK_YEAR: 3,
-  HUNT_HUNGER: 0.6,       // C only hunts below this energy
-  HUNT_CHANCE: 0.25,      // chance per tick that a hungry C actually bites
-  HUNT_GAIN: 0.45,        // energy per eaten Gobbler
+  HUNT_HUNGER: 0.85,      // C only hunts below this energy
+  HUNT_CHANCE: 0.6,       // chance per tick that a hungry C actually bites
+  HUNT_GAIN: 0.55,        // energy per eaten Gobbler
   HUNT_SHARE: 0.3,        // energy each Nipper neighbour gets from the meal
   HUNT_WASTE: 0.04,       // waste per meal
   HUNT_SEED_RANGE: 9,     // Nipper seeds fly further …
   HUNT_SEED_TRIES: 8,     // … and get several tries to find a spot next to prey
-  C_SEEDS: 4,             // number of places the Nippers land
-  C_SEED_CLOVERS: 3,      // clovers per place
+  C_SEEDS: 6,             // number of places the Nippers land
+  C_SEED_CLOVERS: 4,      // clovers per place
 
   // --- Events ---
   EVENT_CHANCE: 0.7,      // chance per year (from year 2), max one per year
@@ -304,7 +305,7 @@ function createSim(seed, over) {
     cnt: [u8(), u8(), u8()], eaten: u8(), flood: u8(), cond: f32(), ghost: u8(), ghostS: u8(),
     pop: [0, 0, 0], health: 0, cActive: false, event: null, pending: null,
     seeds: [], deaths: new Float32Array(18), // [species*6 + cause]: lonely, crowded, starved, poisoned, eaten, squashed
-    hA: [], hB: [], hC: [], hH: [], marks: [], out: [], over: null, bestHealth: 0, sumHealth: 0,
+    hA: [], hB: [], hC: [], hH: [], marks: [], out: [], over: null,
   };
   const noise = () => { // smooth noise from a coarse grid
     const n = 9, g = []; for (let i = 0; i < n * n; i++) g.push(rnd());
@@ -378,9 +379,9 @@ function stepSim(sim) {
   if (t % YT === 0) {
     const year = t / YT + 1;
     if (t) sim.out.push({ k: 'year', year });
-    if (year >= C.C_UNLOCK_YEAR && !sim.pop[2]) seedHunters(sim, year - C.C_UNLOCK_YEAR);
     if (year >= 2 && rnd() < C.EVENT_CHANCE) sim.pending = { type: rnd() < 0.5 ? 'drought' : 'flood', start: t + Math.floor(YT * (0.12 + 0.6 * rnd())) };
   }
+  if (t % YT === ST) { const year = Math.floor(t / YT) + 1; if (year >= C.C_UNLOCK_YEAR && !sim.pop[2]) seedHunters(sim, year - C.C_UNLOCK_YEAR); } // Nippers raid in summer, when there is prey to spare
   if (t > 0 && t % ST === 0) sim.out.push({ k: 'season', season });
   if (sim.pending) {
     const p = sim.pending;
@@ -511,8 +512,6 @@ function stepSim(sim) {
   const tot = pop[0] + pop[1] + pop[2];
   sim.pop = pop; sim.health = tot ? 100 * (sumE / tot) * (sumAge / tot / AN) : 0;
   sim.tick = t + 1;
-  if (sim.health > sim.bestHealth) sim.bestHealth = sim.health;
-  sim.sumHealth += sim.health;
   if (sim.tick % C.HIST_EVERY === 0) { sim.hA.push(pop[0]); sim.hB.push(pop[1]); sim.hC.push(pop[2]); sim.hH.push(sim.health); }
   const dead = pop[0] === 0 ? 0 : pop[1] === 0 ? 1 : -1;
   if (dead >= 0 && !sim.over) {
@@ -526,7 +525,7 @@ function stepSim(sim) {
 (() => {
 let C = CONFIG; const $ = id => document.getElementById(id); // C becomes the run's own config in newGame
 const SEASONS = ['Spring', 'Summer', 'Autumn', 'Winter'], ICONS = ['🌱', '☀️', '🍂', '❄️'], GLOW = ['#7fd66b', '#f2c744', '#e07a35', '#9cc6ee'];
-const NAMES = ['The Gobblers', 'The Mulchers', 'The Nippers'];
+const NAMES = ['The Gobblers', 'The Mulchers'];
 const cv = $('world'); cv.width = cv.height = G; const ctx = cv.getContext('2d'), img = ctx.createImageData(G, G), px = img.data, view = $('view');
 const noise = new Int8Array(CELLS), frost = new Uint8Array(CELLS), mask = new Uint8Array(CELLS), flash = new Uint8Array(CELLS), flashC = new Uint8Array(CELLS); // fading tool feedback; flashC: 0 feed, 1 scoop, 2 muck
 const FLASH = [[150, 255, 90], [255, 150, 40], [225, 120, 255]];
@@ -650,13 +649,13 @@ function local(e) { const r = view.getBoundingClientRect(); return [e.clientX - 
 function cellAt(e) { const [x, y] = local(e); return [Math.floor((x + panX) / (size * zoom) * G), Math.floor((y + panY) / (size * zoom) * G)]; }
 
 /* ---------- tools ---------- */
-function beginStroke() { stroke = { idx: [], t: [], dn: [], dw: [], rn: 0, rw: 0, squash: 0, full: false, empty: false }; }
+function beginStroke() { stroke = { idx: [], t: [], dn: [], dw: [], rn: 0, rw: 0, squash: [], full: false, empty: false }; }
 function applyCell(i) {
   const T = sim.terrain, old = T[i]; let dn = 0, dw = 0;
   if (tool === 'stone' || tool === 'water') {
     const nt = tool === 'stone' ? STONE : WATER;
     if (old === nt) return; T[i] = nt;
-    const s = sim.S[i]; if (s) { sim.S[i] = 0; sim.E[i] = 0; sim.ghost[i] = 255; sim.ghostS[i] = s; sim.deaths[(s - 1) * 6 + 5]++; stroke.squash++; }
+    const s = sim.S[i]; if (s) { stroke.squash.push(i, s, sim.E[i], sim.AGE[i]); sim.S[i] = 0; sim.E[i] = 0; sim.ghost[i] = 255; sim.ghostS[i] = s; sim.deaths[(s - 1) * 6 + 5]++; }
   } else if (tool === 'soil') { if (old === SOIL) return; T[i] = SOIL; }
   else if (tool === 'scoop') {
     if (old === STONE) return; const roomN = C.RESERVOIR_MAX - resN, roomW = C.RESERVOIR_MAX - resW; if (roomN <= 1e-6 && roomW <= 1e-6) { stroke.full = true; return; }
@@ -683,13 +682,14 @@ function endStroke(cancel) {
   if (!stroke) return; const s = stroke; stroke = null;
   for (const i of s.idx) mask[i] = 0;
   if (cancel) { revert(s); return; }
-  if (s.squash) say(s.squash === 1 ? 'You squashed a resident. It had plans.' : `You squashed ${s.squash} residents. They had plans.`);
+  if (s.squash.length) say(s.squash.length === 4 ? 'You squashed a resident. It had plans.' : `You squashed ${s.squash.length / 4} residents. They had plans.`);
   else if (s.full) say('Both reservoirs are full. Greed has a limit, apparently.');
   else if (s.empty) say(tool === 'feed' ? 'No nutrient in the reservoir. Scoop 🧺 some first, where the ground is green.' : 'No waste in the reservoir. Scoop 🧺 some first, where the ground is purple.');
   else if (tool === 'scoop' && s.rn + s.rw > 15) once('greedy', 'Hefty scoop. Whoever lived off that will notice, just so you know.');
   updateMeters();
 }
 function revert(s) {
+  for (let k = 0, q = s.squash; k < q.length; k += 4) { const i = q[k]; sim.S[i] = q[k + 1]; sim.E[i] = q[k + 2]; sim.AGE[i] = q[k + 3]; sim.ghost[i] = 0; sim.deaths[(q[k + 1] - 1) * 6 + 5]--; } // a cancelled stroke squashed nobody
   for (let k = 0; k < s.idx.length; k++) { const i = s.idx[k]; sim.terrain[i] = s.t[k]; sim.N[i] = Math.max(0, sim.N[i] - s.dn[k]); sim.W[i] = Math.max(0, sim.W[i] - s.dw[k]); }
   resN = Math.max(0, Math.min(C.RESERVOIR_MAX, resN - s.rn)); resW = Math.max(0, Math.min(C.RESERVOIR_MAX, resW - s.rw)); updateMeters();
 }
@@ -747,7 +747,7 @@ const WORLDS = [
 const BOONS = [
   ['🪣', 'Bigger buckets', 'Both reservoirs hold 50% more.', c => c.RESERVOIR_MAX *= 1.5],
   ['🧤', 'Steady hands', 'You spill half as much when you scoop.', c => c.SCOOP_LOSS /= 2],
-  ['🥄', 'Deep scoop', 'Scoop takes three quarters of a cell instead of half.', c => c.HARVEST_FRAC = 0.75],
+  ['🥄', 'Deep scoop', 'Scoop takes three quarters of a cell instead of half.', c => c.HARVEST_FRAC = 0.75, () => C.HARVEST_FRAC < 0.75],
   ['🧥', 'Thick fur', 'Winter upkeep is 15% lower.', c => { c.UPKEEP_SEASON = c.UPKEEP_SEASON.slice(); c.UPKEEP_SEASON[3] *= 0.85; }],
   ['♨️', 'Hot compost', 'Waste rots into nutrient three times faster.', c => c.DECOMP *= 3],
   ['🌱', 'Rich soil', 'Soil regrows nutrient 30% faster.', c => c.GROW *= 1.3],
@@ -773,23 +773,26 @@ function openBoons(year) {
 
 /* ---------- end screen ---------- */
 const CAUSES = [
-  ['loneliness – too few neighbours, too many opinions', 'loneliness – nobody to share the rubbish with', 'loneliness – the pack got too thin'],
-  ['crowding – they were literally standing on each other', 'crowding – too many cooks in the compost', 'crowding – too many teeth in one place'],
-  ['starvation – the nutrient ran out where they lived', 'starvation – too little waste. Yes, you can have too little waste', 'starvation – the Gobblers ran out or kept their distance'],
-  ['poisoning – they drowned in their own waste', 'poisoning (which should be impossible, congratulations)', 'poisoning – too much waste around the dinner table'],
-  ['eaten by Nippers, who do not apologise', 'eaten', 'eaten'],
-  ['crushed by you. We are not judging. We are.', 'crushed by you. We are not judging. We are.', 'crushed by you. We are not judging. We are.'],
+  ['loneliness – too few neighbours, too many opinions', 'loneliness – nobody to share the rubbish with'],
+  ['crowding – they were literally standing on each other', 'crowding – too many cooks in the compost'],
+  ['starvation – the nutrient ran out where they lived', 'starvation – too little waste. Yes, you can have too little waste'],
+  ['poisoning – they drowned in their own waste', 'poisoning (which should be impossible, congratulations)'],
+  ['eaten by Nippers, who do not apologise', 'eaten'],
+  ['crushed by you. We are not judging. We are.', 'crushed by you. We are not judging. We are.'],
 ];
+function loadRuns() { // best runs, longest first
+  let r; try { r = JSON.parse(store.get('kretslopp_runs')); } catch (e) {}
+  if (Array.isArray(r)) return r;
+  const old = +store.get('kretslopp_best2'); return old ? [{ t: old, w: '', d: '' }] : []; // record from before the board existed
+}
 function endRun() {
   const o = sim.over, ST = C.SEASON_TICKS, YT = ST * 4, yrs = Math.floor(o.tick / YT), ses = Math.floor(o.tick % YT / ST);
-  const bestOld = +store.get('kretslopp_best2') || 0, rec = o.tick > bestOld; if (rec) store.set('kretslopp_best2', o.tick);
+  const runs = loadRuns(), bestOld = runs.length ? +runs[0].t : 0, rec = o.tick > bestOld;
   const span = t => { const y = Math.floor(t / YT), q = Math.floor(t % YT / ST); return y + ' yr' + (q ? ' + ' + q : ''); };
   $('endTitle').textContent = pick(['The ecosystem collapsed', 'It went the way it went', 'Nature has spoken']) + (rec && bestOld ? ' – but a new record!' : '');
-  $('obit').innerHTML = `<b style="color:${['var(--A)', 'var(--B)', 'var(--C)'][o.sp]}">${NAMES[o.sp]}</b> died out first – ${SEASONS[o.season].toLowerCase()}, year ${yrs + 1}.<br>Most common cause of death at the end: ${CAUSES[o.cause][o.sp]}.`;
+  $('obit').innerHTML = `<b style="color:${['var(--A)', 'var(--B)'][o.sp]}">${NAMES[o.sp]}</b> died out first – ${SEASONS[o.season].toLowerCase()}, year ${yrs + 1}.<br>Most common cause of death at the end: ${CAUSES[o.cause][o.sp]}.`;
   $('endStats').innerHTML = `<div><b>${span(o.tick)}</b><small>${ses ? 'and seasons ' : ''}survived</small></div><div><b>${span(Math.max(bestOld, o.tick))}</b><small>your record</small></div><div><b>${world[0]}</b><small>world</small></div>`;
-  let runs = []; try { runs = JSON.parse(store.get('kretslopp_runs')) || []; } catch (e) {}
-  if (!runs.length && bestOld) runs.push({ t: bestOld, w: '', d: '' }); // carry over the record from before the board existed
-  const me = { t: o.tick, w: world[0], d: new Date().toISOString().slice(0, 10) }; runs.push(me); runs.sort((a, b) => b.t - a.t); runs.length = Math.min(runs.length, 5);
+  const me = { t: o.tick, w: world[0], d: new Date().toLocaleDateString('sv-SE') }; runs.push(me); runs.sort((a, b) => b.t - a.t); runs.length = Math.min(runs.length, 5);
   store.set('kretslopp_runs', JSON.stringify(runs));
   const board = $('board'); board.textContent = '';
   for (const r of runs) { const li = document.createElement('li'); li.textContent = 'Year ' + (Math.floor(r.t / YT) + 1) + ', ' + SEASONS[Math.floor(r.t % YT / ST)].toLowerCase() + (r.w ? ' · ' + r.w : '') + (r.d ? ' · ' + r.d : ''); if (r === me) li.className = 'me'; board.appendChild(li); }
@@ -813,7 +816,7 @@ function drawGraph() {
 
 /* ---------- game loop ---------- */
 function newGame() {
-  let w; do w = pick(WORLDS); while (w === world); world = store.get('kretslopp_best2') ? w : WORLDS[0]; // first ever run: the plain meadow
+  let w; do w = pick(WORLDS); while (w === world); world = world || loadRuns().length ? w : WORLDS[0]; // first ever run: the plain meadow
   sim = createSim((Date.now() ^ Math.random() * 1e9) >>> 0, world[2]); C = sim.cfg; resN = resW = C.RESERVOIR_START; stroke = null; said = {}; acc = 0; lastSayTick = -999;
   zoom = 1; panX = panY = 0; applyView(); setPaused(false); closeModal('end'); updateHud();
   const x = $('spark').getContext('2d'); x.clearRect(0, 0, 9999, 9999);

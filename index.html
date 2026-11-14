@@ -835,7 +835,7 @@ const MEDALS = [ // [id, icon, name, how to earn it, earned right now?]
   ['fed', '🍽', 'Soup kitchen', 'Feed 150 hungry creatures in one run.', () => run.fed >= 150],
   ['goals', '🌟', 'Overachiever', 'Finish 6 goals in one run.', () => run.goals >= 6],
   ['boom', '🎉', 'Baby boom', 'Have 2000 creatures alive at once after the first spring.', () => sim.tick > 300 && sim.pop[0] + sim.pop[1] >= 2000],
-  ['nip', '🦷', 'Pest control', 'Outlast a Nipper raid.', () => run.nipGone],
+  ['nip', '🦷', 'Pest control', 'Outlast a Nipper pack that grew to 100.', () => run.nipGone],
   ['edge', '😅', 'Close call', 'Drop below 10 of a species, then last another year.', () => run.low > 0 && sim.tick - run.low >= YEAR],
 ];
 let medals = (store.get('kretslopp_medals') || '').split(',').filter(Boolean), run = {};
@@ -933,7 +933,7 @@ function tick() {
   drainMessages(); narrate(); if (!sim.over) checkGoal(); updateHud();
   if (pb && sim.tick === pb + 1) { banner('🏆 New record! Everything from here is a bonus.', 5000); sfx('record'); }
   if (document.body.classList.contains('danger') && sim.tick % 4 === 0) sfx('danger');
-  if (sim.pop[2]) run.hadC = true; else if (run.hadC) run.nipGone = true;
+  if (sim.pop[2] >= 100) run.hadC = true; else if (run.hadC && !sim.pop[2]) run.nipGone = true; // only a pack that grew to 100 counts
   if (!run.low && Math.min(sim.pop[0], sim.pop[1]) < 10) run.low = sim.tick;
   if (sim.tick % 10 === 0 && !sim.over) checkMedals();
   if (sim.tick % C.HIST_EVERY === 0) drawSpark();

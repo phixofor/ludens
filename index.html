@@ -51,7 +51,7 @@ small{color:var(--dim);font-size:11px}
 #tools button,#ctrl button{min-height:52px;border-radius:12px;background:var(--panel);border:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:11px;transition:.12s}
 #tools button span{font-size:21px;line-height:1.1}
 #tools button.on{border-color:var(--season);background:rgba(255,255,255,.1);box-shadow:0 0 14px -4px var(--season),inset 0 0 0 1px var(--season);transform:translateY(-2px)}
-#ctrl{display:grid;grid-template-columns:repeat(8,1fr);gap:5px}
+#ctrl{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
 #ctrl button{min-height:46px;font-size:15px;font-weight:600}
 #ctrl button.on{border-color:var(--season);background:rgba(255,255,255,.12)}
 #ctrl button:active,#tools button:active,#zoomBtns button:active{transform:scale(.94)}
@@ -123,10 +123,6 @@ small{color:var(--dim);font-size:11px}
       <button data-t="pan"><span>✋</span>Pan</button>
     </div>
     <div id="ctrl">
-      <button id="bS" aria-label="Small brush">S</button>
-      <button id="bM" aria-label="Medium brush">M</button>
-      <button id="bL" aria-label="Large brush">L</button>
-      <button id="undo" aria-label="Undo">↶</button>
       <button id="pause" aria-label="Pause">⏸</button>
       <button id="speed" aria-label="Speed">1×</button>
       <button id="heat" aria-label="Health map">🌡</button>
@@ -181,7 +177,7 @@ small{color:var(--dim);font-size:11px}
     <li>Every new year you pick one gift.</li>
     <li>If the Gobblers or the Mulchers die out, the run is over – your score is how long they lasted.</li>
   </ol>
-  <small>Keys: 1–7 tools · [ ] brush · space pause · Z undo · H health map · +/− zoom · two fingers pan and zoom</small>
+  <small>Keys: 1–7 tools · space pause · H health map · +/− zoom · two fingers pan and zoom</small>
   <button class="go" data-close>Back to the mud</button>
 </div></div>
 
@@ -266,7 +262,7 @@ const CONFIG = {
   RESERVOIR_MAX: 40, RESERVOIR_START: 20, // one reservoir for nutrient, one for waste
   HARVEST_FRAC: 0.5,      // share of a cell's nutrient and waste that Scoop takes
   FERT_AMOUNT: 0.2,       // nutrient (Feed) or waste (Muck) poured per cell
-  BRUSH: [1, 3, 6],       // brush radius S/M/L
+  BRUSH: 2,               // brush radius (cells)
 
   // --- Score ---
   AGE_NORM: 40,           // age (ticks) that counts as "grown up"
@@ -531,8 +527,8 @@ const noise = new Int8Array(CELLS), frost = new Uint8Array(CELLS), mask = new Ui
 const FLASH = [[150, 255, 90], [255, 150, 40], [225, 120, 255]];
 for (let i = 0; i < CELLS; i++) { const h = Math.imul(i ^ 0x9E3779B9, 0x85EBCA6B) >>> 0; noise[i] = (h >>> 8) % 9 - 4; frost[i] = (h >>> 16) % 19 === 0 ? 1 : 0; }
 
-let sim, paused = false, speed = 1, overlay = false, tool = 'feed', brush = 1, zoom = 1, panX = 0, panY = 0, size = 320;
-let resN, resW, world = null, stroke = null, lastStroke = null, modals = 0, acc = 0, last = 0, sayTimer = 0, bannerTimer = 0, lastSayTick = -999, said = {};
+let sim, paused = false, speed = 1, overlay = false, tool = 'feed', zoom = 1, panX = 0, panY = 0, size = 320;
+let resN, resW, world = null, stroke = null, modals = 0, acc = 0, last = 0, sayTimer = 0, bannerTimer = 0, lastSayTick = -999, said = {};
 const store = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
 
 /* ---------- narrator ---------- */
@@ -671,18 +667,17 @@ function applyCell(i) {
   mask[i] = 1; stroke.idx.push(i); stroke.t.push(old); stroke.dn.push(dn); stroke.dw.push(dw);
 }
 function stamp(cx, cy) {
-  const R = C.BRUSH[brush], lim = R * R + R * 0.8;
+  const R = C.BRUSH, lim = R * R + R * 0.8;
   for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) {
     if (dx * dx + dy * dy > lim) continue; const x = cx + dx, y = cy + dy; if (x < 0 || y < 0 || x >= G || y >= G) continue;
     const i = y * G + x; if (!mask[i]) applyCell(i);
   }
 }
-function strokeTo(x0, y0, x1, y1) { const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)), st = Math.max(1, C.BRUSH[brush]); for (let s = st; s < n; s += st) stamp(Math.round(x0 + (x1 - x0) * s / n), Math.round(y0 + (y1 - y0) * s / n)); stamp(x1, y1); updateMeters(); }
+function strokeTo(x0, y0, x1, y1) { const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)), st = Math.max(1, C.BRUSH); for (let s = st; s < n; s += st) stamp(Math.round(x0 + (x1 - x0) * s / n), Math.round(y0 + (y1 - y0) * s / n)); stamp(x1, y1); updateMeters(); }
 function endStroke(cancel) {
   if (!stroke) return; const s = stroke; stroke = null;
   for (const i of s.idx) mask[i] = 0;
   if (cancel) { revert(s); return; }
-  if (s.idx.length) lastStroke = s;
   if (s.squash) say(s.squash === 1 ? 'You squashed a resident. It had plans.' : `You squashed ${s.squash} residents. They had plans.`);
   else if (s.full) say('Both reservoirs are full. Greed has a limit, apparently.');
   else if (s.empty) say(tool === 'feed' ? 'No nutrient in the reservoir. Scoop 🧺 some first, where the ground is green.' : 'No waste in the reservoir. Scoop 🧺 some first, where the ground is purple.');
@@ -692,11 +687,6 @@ function endStroke(cancel) {
 function revert(s) {
   for (let k = 0; k < s.idx.length; k++) { const i = s.idx[k]; sim.terrain[i] = s.t[k]; sim.N[i] = Math.max(0, sim.N[i] - s.dn[k]); sim.W[i] = Math.max(0, sim.W[i] - s.dw[k]); }
   resN = Math.max(0, Math.min(C.RESERVOIR_MAX, resN - s.rn)); resW = Math.max(0, Math.min(C.RESERVOIR_MAX, resW - s.rw)); updateMeters();
-}
-function undo() {
-  if (!lastStroke) { say('Nothing to undo. Yet.'); return; }
-  const s = lastStroke; lastStroke = null; revert(s);
-  say(s.squash ? 'Undone. The squashed remain squashed, though.' : 'Undone. Nobody saw anything.');
 }
 
 /* ---------- pointers ---------- */
@@ -723,12 +713,10 @@ view.addEventListener('wheel', e => { e.preventDefault(); const [x, y] = local(e
 
 /* ---------- buttons ---------- */
 function setTool(t) { tool = t; document.querySelectorAll('#tools button').forEach(b => b.classList.toggle('on', b.dataset.t === t)); view.style.cursor = t === 'pan' ? 'grab' : 'crosshair'; }
-function setBrush(b) { brush = b; ['bS', 'bM', 'bL'].forEach((id, i) => $(id).classList.toggle('on', i === b)); }
 function setPaused(p) { paused = p; $('pause').textContent = p ? '▶' : '⏸'; $('pause').classList.toggle('on', p); }
 function toggleHeat() { overlay = !overlay; $('heat').classList.toggle('on', overlay); if (overlay) once('heat', 'Health map: green is doing fine, red regrets its life choices.'); }
 document.querySelectorAll('#tools button').forEach(b => b.onclick = () => setTool(b.dataset.t));
-['bS', 'bM', 'bL'].forEach((id, i) => $(id).onclick = () => setBrush(i));
-$('undo').onclick = undo; $('pause').onclick = () => setPaused(!paused); $('heat').onclick = toggleHeat;
+$('pause').onclick = () => setPaused(!paused); $('heat').onclick = toggleHeat;
 $('speed').onclick = () => { speed = speed === 1 ? 2 : speed === 2 ? 4 : 1; $('speed').textContent = speed + '×'; updateHud(); };
 $('zin').onclick = () => setZoom(zoom * 1.5); $('zout').onclick = () => setZoom(zoom / 1.5);
 function openModal(id) { const m = $(id); if (!m.classList.contains('open')) { m.classList.add('open'); modals++; } }
@@ -738,8 +726,7 @@ document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => { const
 addEventListener('keydown', e => {
   const k = e.key.toLowerCase(), tools = ['scoop', 'feed', 'muck', 'stone', 'water', 'soil', 'pan'];
   if (k === ' ') { e.preventDefault(); setPaused(!paused); } else if (k >= '1' && k <= '7') setTool(tools[k - 1]);
-  else if (k === 'z') undo(); else if (k === 'h') toggleHeat(); else if (k === '+' || k === '=') setZoom(zoom * 1.5); else if (k === '-') setZoom(zoom / 1.5);
-  else if (k === '[') setBrush(Math.max(0, brush - 1)); else if (k === ']') setBrush(Math.min(2, brush + 1));
+  else if (k === 'h') toggleHeat(); else if (k === '+' || k === '=') setZoom(zoom * 1.5); else if (k === '-') setZoom(zoom / 1.5);
 });
 
 /* ---------- worlds and gifts: what makes one run differ from the next ---------- */
@@ -816,7 +803,7 @@ function drawGraph() {
 /* ---------- game loop ---------- */
 function newGame() {
   let w; do w = pick(WORLDS); while (w === world); world = store.get('kretslopp_best2') ? w : WORLDS[0]; // first ever run: the plain meadow
-  sim = createSim((Date.now() ^ Math.random() * 1e9) >>> 0, world[2]); C = sim.cfg; resN = resW = C.RESERVOIR_START; stroke = lastStroke = null; said = {}; acc = 0; lastSayTick = -999;
+  sim = createSim((Date.now() ^ Math.random() * 1e9) >>> 0, world[2]); C = sim.cfg; resN = resW = C.RESERVOIR_START; stroke = null; said = {}; acc = 0; lastSayTick = -999;
   zoom = 1; panX = panY = 0; applyView(); setPaused(false); closeModal('end'); updateHud();
   const x = $('spark').getContext('2d'); x.clearRect(0, 0, 9999, 9999);
   say('🌍 ' + world[0] + '. ' + world[1], 6000);
@@ -837,7 +824,7 @@ function frame(now) {
 document.addEventListener('visibilitychange', () => { acc = 0; last = performance.now(); }); // hidden tab = automatic pause
 addEventListener('resize', resize);
 $('restart').onclick = newGame;
-setTool('feed'); setBrush(1); resize(); newGame();
+setTool('feed'); resize(); newGame();
 if (!store.get('kretslopp_intro')) openModal('intro');
 window.__game = { get sim() { return sim; } };
 requestAnimationFrame(frame);

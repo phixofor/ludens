@@ -30,7 +30,13 @@ small{color:var(--dim);font-size:11px}
 #popCard{display:flex;align-items:center;gap:8px}
 #goalCard{grid-column:1/3;display:flex;justify-content:space-between;gap:8px;font-size:12.5px;background:linear-gradient(90deg,rgba(127,214,107,.24) var(--p,0%),var(--panel) var(--p,0%))}
 #goalTxt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#stars{white-space:nowrap;letter-spacing:1px}
+#stars{display:inline-block;white-space:nowrap;letter-spacing:1px}
+#stars.pop{animation:pop .6s}
+@keyframes pop{40%{transform:scale(1.7)}}
+#medals{display:flex;flex-wrap:wrap;gap:4px 8px;margin-top:10px;font-size:24px}
+#medals span{opacity:.25;filter:grayscale(1);cursor:pointer}
+#medals span.got{opacity:1;filter:none}
+#medals span.new{text-shadow:0 0 12px var(--A)}
 #pb{font-size:10.5px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #pb.new{color:var(--A)}
 body.danger #view{animation:danger 1s infinite}
@@ -193,6 +199,7 @@ body.danger #view{animation:danger 1s infinite}
     <li>Every new year you pick one gift.</li>
     <li>Each season brings a small goal; every goal is a star, and three stars are a bonus gift.</li>
     <li>Every year you survive, in any run, counts toward unlocking new worlds.</li>
+    <li>Medals are kept forever; the end screen shows which ones you are missing.</li>
     <li>If the Gobblers or the Mulchers die out, the run is over – your score is how long they lasted.</li>
   </ol>
   <small>Keys: 1–7 tools · space pause · H health map · M sound · +/− zoom · two fingers pan and zoom</small>
@@ -209,6 +216,7 @@ body.danger #view{animation:danger 1s infinite}
   </div>
   <div id="endStats"></div>
   <div id="unlock"></div>
+  <div id="medals"></div><small id="medalTxt"></small>
   <p style="margin-bottom:0"><small>YOUR BEST RUNS – saved in this browser only</small></p>
   <ol id="board"></ol>
   <button class="go" id="restart">Try again. Nature is forgiving. (No.)</button>
@@ -243,7 +251,7 @@ const CONFIG = {
   WASTE_TOXIC: 0.6,       // waste level where A and C start to suffer
   WASTE_DRAIN: 0.04,      // energy lost per tick above that level
   CROWD_DRAIN: 0.008,     // extra upkeep per same-species neighbour beyond 3 (crowding = competition)
-  WINTER_GROWTH: 0.12,    // every winter is this much harsher than the last
+  WINTER_GROWTH: 0.2,     // every winter is this much harsher than the last
 
   // --- Birth ---
   BIRTH_FOOD: 0.12,       // food a birth eats from its cell (3 neighbours) – no food, no babies
@@ -720,7 +728,7 @@ function endStroke(cancel) {
   for (const i of s.idx) mask[i] = 0;
   if (cancel) { revert(s); return; }
   if (s.squash.length) say(s.squash.length === 4 ? 'You squashed a resident. It had plans.' : `You squashed ${s.squash.length / 4} residents. They had plans.`);
-  else if (s.fed) { say(`${tool === 'feed' ? '🌿' : '💩'} ${s.fed} hungry ${tool === 'feed' ? 'Gobbler' : 'Mulcher'}${s.fed > 1 ? 's' : ''} fed.`, 2200); sfx('fed'); }
+  else if (s.fed) { run.fed += s.fed; say(`${tool === 'feed' ? '🌿' : '💩'} ${s.fed} hungry ${tool === 'feed' ? 'Gobbler' : 'Mulcher'}${s.fed > 1 ? 's' : ''} fed.`, 2200); sfx('fed'); }
   else if (s.full) say('Both reservoirs are full. Greed has a limit, apparently.');
   else if (s.empty) say(tool === 'feed' ? 'No nutrient in the reservoir. Scoop 🧺 some first, where the ground is green.' : 'No waste in the reservoir. Scoop 🧺 some first, where the ground is purple.');
   else if (tool === 'scoop' && s.rn + s.rw > 15) once('greedy', 'Hefty scoop. Whoever lived off that will notice, just so you know.');
@@ -791,8 +799,8 @@ const BOONS = [
   ['🥄', 'Deep scoop', 'Scoop takes three quarters of a cell instead of half.', c => c.HARVEST_FRAC = 0.75, () => C.HARVEST_FRAC < 0.75],
   ['🧥', 'Thick fur', 'Winter upkeep is 15% lower.', c => { c.UPKEEP_SEASON = c.UPKEEP_SEASON.slice(); c.UPKEEP_SEASON[3] *= 0.85; }],
   ['♨️', 'Hot compost', 'Waste rots into nutrient three times faster.', c => c.DECOMP *= 3],
-  ['🌱', 'Rich soil', 'Soil regrows nutrient 30% faster.', c => c.GROW *= 1.3],
-  ['♻️', 'Clean plates', 'Much less of every meal is wasted.', c => c.EAT_LOSS *= 0.7],
+  ['🌱', 'Rich soil', 'Soil regrows nutrient 20% faster.', c => c.GROW *= 1.2],
+  ['♻️', 'Clean plates', 'A fifth less of every meal is wasted.', c => c.EAT_LOSS *= 0.8],
   ['🤢', 'Iron stomachs', 'Gobblers and Nippers tolerate far more waste.', c => c.WASTE_TOXIC += 0.3],
   ['⛱', 'Weatherproof', 'Droughts and floods last half as long.', c => { c.DROUGHT_TICKS >>= 1; c.FLOOD_TICKS >>= 1; }],
   ['🦷', 'Dull teeth', 'Nippers bite half as often.', c => c.HUNT_CHANCE /= 2, () => sim.tick / YEAR + 2 >= C.C_UNLOCK_YEAR],
@@ -816,6 +824,24 @@ function openBoons(title) {
   boonAt = performance.now(); openModal('boon');
 }
 
+/* ---------- medals: things to collect across runs ---------- */
+const MEDALS = [ // [id, icon, name, how to earn it, earned right now?]
+  ['y3', '🥉', 'Three winters', 'Survive 3 years.', () => sim.tick >= 3 * YEAR],
+  ['y5', '🥈', 'Five winters', 'Survive 5 years.', () => sim.tick >= 5 * YEAR],
+  ['y8', '🥇', 'Eight winters', 'Survive 8 years.', () => sim.tick >= 8 * YEAR],
+  ['fed', '🍽', 'Soup kitchen', 'Feed 150 hungry creatures in one run.', () => run.fed >= 150],
+  ['goals', '🌟', 'Overachiever', 'Finish 6 goals in one run.', () => run.goals >= 6],
+  ['boom', '🎉', 'Baby boom', 'Have 2800 creatures alive at once.', () => sim.pop[0] + sim.pop[1] >= 2800],
+  ['nip', '🦷', 'Pest control', 'Outlast a Nipper raid.', () => run.nipGone],
+  ['edge', '😅', 'Close call', 'Drop below 10 of a species, then last another year.', () => run.low > 0 && sim.tick - run.low >= YEAR],
+];
+let medals = (store.get('kretslopp_medals') || '').split(',').filter(Boolean), run = {};
+function checkMedals() {
+  for (const m of MEDALS) if (!medals.includes(m[0]) && m[4]()) {
+    medals.push(m[0]); run.medals.push(m[0]); store.set('kretslopp_medals', medals.join(',')); banner(`🏅 Medal: ${m[2]} – ${m[3]}`, 5000); sfx('goal');
+  }
+}
+
 /* ---------- goals: one small job per season; three stars = a bonus gift ---------- */
 function newGoal() {
   const se = Math.floor(sim.tick / C.SEASON_TICKS) % 4, round = n => Math.max(10, Math.round(n / 10) * 10), weak = sim.pop[0] < sim.pop[1] ? 0 : 1;
@@ -829,7 +855,7 @@ function newGoal() {
 function checkGoal() {
   const end = sim.tick > 0 && sim.tick % C.SEASON_TICKS === 0;
   if (!goal.done && goal.cur() >= goal.target && (end || !goal.atEnd)) {
-    goal.done = true; stars++; sfx('goal'); banner('⭐ Goal done: ' + goal.txt, 3500);
+    goal.done = true; stars++; run.goals++; sfx('goal'); const st = $('stars'); st.classList.remove('pop'); void st.offsetWidth; st.classList.add('pop'); banner('⭐ Goal done: ' + goal.txt, 3500);
     if (stars >= 3) { stars = 0; openBoons('⭐⭐⭐ Bonus gift'); }
   }
   if (end) { if (!goal.done) say('Goal missed: ' + goal.txt + '. Nature shrugs.'); newGoal(); }
@@ -863,6 +889,10 @@ function endRun() {
   store.set('kretslopp_runs', JSON.stringify(runs));
   const board = $('board'); board.textContent = '';
   for (const r of runs) { const li = document.createElement('li'); li.textContent = 'Year ' + (Math.floor(r.t / YT) + 1) + ', ' + SEASONS[Math.floor(r.t % YT / ST)].toLowerCase() + (r.w ? ' · ' + r.w : '') + (r.d ? ' · ' + r.d : ''); if (r === me) li.className = 'me'; board.appendChild(li); }
+  checkMedals(); const md = $('medals'); md.textContent = '';
+  for (const m of MEDALS) { const el = document.createElement('span'); el.textContent = m[1]; el.className = (medals.includes(m[0]) ? 'got' : '') + (run.medals.includes(m[0]) ? ' new' : ''); el.onclick = () => $('medalTxt').textContent = m[2] + ' – ' + m[3]; md.appendChild(el); }
+  $('medalTxt').textContent = (run.medals.length ? '🏅 New: ' + MEDALS.filter(m => run.medals.includes(m[0])).map(m => m[2]).join(', ') + ' · ' : '') + medals.length + '/' + MEDALS.length + ' medals · tap one to see what it takes';
+  const short = Math.ceil((bestOld - o.tick) / ST); if (short > 0 && short <= 4) $('obit').innerHTML += `<br><b>So close – only ${short} season${short > 1 ? 's' : ''} short of your record.</b>`;
   const had = openWorlds().length; life += o.tick; store.set('kretslopp_life', life);
   const open = openWorlds(), next = WORLDS[open.length], yrsLife = life / YT;
   $('unlock').innerHTML = (open.length > had ? `🔓 New world unlocked: <b>${open[open.length - 1][0]}</b><br>` : '')
@@ -889,7 +919,7 @@ function drawGraph() {
 /* ---------- game loop ---------- */
 function newGame() {
   const open = openWorlds(); let w; do w = pick(open); while (open.length > 1 && w === world); world = w;
-  const runs = loadRuns(); pb = runs.length ? +runs[0].t : 0; stars = 0;
+  const runs = loadRuns(); pb = runs.length ? +runs[0].t : 0; stars = 0; run = { fed: 0, goals: 0, low: 0, hadC: false, nipGone: false, medals: [] };
   sim = createSim((Date.now() ^ Math.random() * 1e9) >>> 0, world[2]); C = sim.cfg; resN = resW = C.RESERVOIR_START; stroke = null; said = {}; acc = 0; lastSayTick = -999;
   zoom = 1; panX = panY = 0; applyView(); setPaused(false); closeModal('end'); newGoal(); checkGoal(); updateHud();
   const x = $('spark').getContext('2d'); x.clearRect(0, 0, 9999, 9999);
@@ -900,6 +930,9 @@ function tick() {
   drainMessages(); narrate(); if (!sim.over) checkGoal(); updateHud();
   if (pb && sim.tick === pb + 1) { banner('🏆 New record! Everything from here is a bonus.', 5000); sfx('record'); }
   if (document.body.classList.contains('danger') && sim.tick % 4 === 0) sfx('danger');
+  if (sim.pop[2]) run.hadC = true; else if (run.hadC) run.nipGone = true;
+  if (!run.low && Math.min(sim.pop[0], sim.pop[1]) < 10) run.low = sim.tick;
+  if (sim.tick % 10 === 0 && !sim.over) checkMedals();
   if (sim.tick % C.HIST_EVERY === 0) drawSpark();
   if (sim.over) { endStroke(false); endRun(); }
 }

@@ -9,6 +9,7 @@ Each game is a single static web page you can open in a browser.
 |------|------------|
 | [`kretslopp/`](kretslopp) | A little ecosystem game about food, creatures and the seasons. Keep the cycle going as long as you can. |
 | [`ballatro/`](ballatro) | A mobile-friendly mash-up of capsule-ball physics and a joker-card economy. |
+| [`wyrmhole/`](wyrmhole) | A one-thumb arcade roguelike. You are a serpent of starlight: draw a loop, bite your own tail, and everything inside falls out of the sky. |
 
 ## Running a game
 

@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#06050d">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Wyrmhole</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2306050d'/%3E%3Ccircle cx='16' cy='16' r='9' fill='none' stroke='%23ffcf5a' stroke-width='5'/%3E%3C/svg%3E">
+<style>
+:root{--ink:#f3ecff;--dim:#a096bd;--gold:#ffcf5a;--pink:#ff4d7e;--bg:#06050d}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none;background:var(--bg)}
+body{color:var(--ink);font:15px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:none}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;touch-action:manipulation}
+#app{position:relative;height:100vh;height:100dvh;width:min(100vw,calc(100vh*400/560));width:min(100vw,calc(100dvh*400/560));margin:0 auto;overflow:hidden}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#vig{position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 90px 10px #000}
+#hud{position:absolute;left:0;right:0;top:0;display:grid;grid-template-columns:1fr auto 1fr;align-items:start;padding:calc(12px + env(safe-area-inset-top)) 12px 0;pointer-events:none;opacity:0;transition:opacity .3s}
+.ingame #hud{opacity:1}
+.low #vig{animation:low 1s ease-in-out infinite}
+@keyframes low{50%{box-shadow:inset 0 0 90px 10px rgba(255,24,72,.5)}}
+#hearts{font-size:21px;letter-spacing:2px;color:var(--pink);text-shadow:0 0 10px var(--pink)}
+#hearts s{text-decoration:none;opacity:.22;text-shadow:none}
+#mid{text-align:center}
+#score{display:block;font-size:30px;line-height:1.05;font-weight:800;font-variant-numeric:tabular-nums;text-shadow:0 0 18px rgba(255,207,90,.5)}
+#lvl{color:var(--dim);font-size:11px;letter-spacing:.14em}
+#time{justify-self:end;font-variant-numeric:tabular-nums;color:var(--dim);padding:5px 40px 0 0}
+#xp{position:absolute;left:0;right:0;top:env(safe-area-inset-top);height:3px;background:rgba(255,255,255,.08);opacity:0}
+.ingame #xp{opacity:1}
+#xp i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--gold),var(--pink));box-shadow:0 0 8px var(--gold);transition:width .2s}
+#mute{position:absolute;top:calc(4px + env(safe-area-inset-top));right:4px;width:44px;height:44px;font-size:19px;opacity:.75;z-index:5}
+#mute.off{opacity:.3;text-decoration:line-through}
+#hint,#hold,#banner{position:absolute;left:0;right:0;text-align:center;pointer-events:none;padding:0 20px}
+#hint{top:21%;font-size:17px;font-weight:600;text-shadow:0 2px 12px #000,0 0 4px #000}
+#hold{bottom:calc(9% + env(safe-area-inset-bottom));color:var(--dim);font-size:12px;letter-spacing:.14em;text-transform:uppercase;opacity:0;transition:opacity .25s}
+#hold.on{opacity:1}
+#banner{top:29%;opacity:0}
+#banner.go{animation:banner 3s ease-out}
+@keyframes banner{0%{opacity:0;transform:scale(1.35)}10%{opacity:1;transform:none}78%{opacity:1}100%{opacity:0;transform:translateY(-10px)}}
+#banner b{display:block;font-size:25px;letter-spacing:.3em;text-indent:.3em;font-weight:800;text-shadow:0 0 22px var(--pink),0 2px 10px #000}
+#banner span{color:var(--ink);opacity:.85;font-size:14px;text-shadow:0 2px 8px #000,0 0 3px #000}
+.screen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:20px;text-align:center;opacity:0;pointer-events:none;transition:opacity .35s}
+.screen.on{opacity:1;pointer-events:auto}
+#title{background:linear-gradient(rgba(6,5,13,.8),rgba(6,5,13,.5) 45%,rgba(6,5,13,.86))}
+#cards,#over{background:rgba(6,5,13,.72)}
+#cards{pointer-events:none!important}
+#cards.ready{pointer-events:auto!important}
+h1{margin:0;font-size:clamp(38px,12.5vw,58px);font-weight:900;letter-spacing:.06em;line-height:1;background:linear-gradient(100deg,var(--gold),var(--pink) 70%,#b98cff);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 18px rgba(255,120,120,.45))}
+h1 i{display:inline-block;width:.74em;height:.74em;margin:0 .05em;border-radius:50%;vertical-align:-.05em;background:conic-gradient(from 20deg,transparent 0 9%,var(--gold) 14%,var(--pink) 70%,#fff 100%);-webkit-mask:radial-gradient(closest-side,transparent 58%,#000 62%);mask:radial-gradient(closest-side,transparent 58%,#000 62%);animation:spin 4s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+h2{margin:0;font-size:24px;letter-spacing:.04em}
+.tag{color:var(--gold);font-size:12px;letter-spacing:.3em;text-indent:.3em;text-transform:uppercase}
+.lore{margin:0;color:var(--dim);font-size:14px;line-height:1.5;text-wrap:balance}
+.lore b{color:var(--ink);font-weight:600}
+#forms{display:flex;gap:14px;margin-top:6px}
+.form{position:relative;width:46px;height:46px;border-radius:50%;background:radial-gradient(circle at 35% 32%,#fff,hsl(var(--h),100%,60%) 42%,hsl(calc(var(--h) + 50),90%,26%));box-shadow:0 0 0 2px rgba(255,255,255,.12);transition:transform .15s,box-shadow .15s}
+.form.sel{transform:scale(1.14);box-shadow:0 0 0 2px #fff,0 0 22px hsl(var(--h),100%,60%)}
+.form.locked{filter:grayscale(1) brightness(.5)}
+.form.locked::after{content:"🔒";position:absolute;inset:0;display:grid;place-items:center;font-size:17px;filter:brightness(2)}
+#blurb{margin:0;min-height:2.7em;font-size:13.5px;color:var(--dim)}
+#blurb b{color:var(--ink)}
+.btn{min-width:210px;padding:15px 34px;border-radius:999px;font-size:19px;font-weight:800;letter-spacing:.28em;text-indent:.28em;color:#1a0b12;background:linear-gradient(100deg,var(--gold),#ff8a5c 60%,var(--pink));box-shadow:0 0 30px rgba(255,140,90,.55),inset 0 1px 0 rgba(255,255,255,.5)}
+.btn:active{transform:scale(.96)}
+.link{color:var(--dim);font-size:13px;letter-spacing:.14em;text-transform:uppercase;padding:12px 16px}
+#best{margin:0;font-size:13px;color:var(--dim);font-variant-numeric:tabular-nums}
+.how{margin:4px 0 0;padding:0;list-style:none;counter-reset:n;font-size:13px;color:var(--dim);text-align:left}
+.how li{counter-increment:n;padding:2px 0}
+.how li::before{content:counter(n);display:inline-block;width:18px;height:18px;margin-right:8px;border-radius:50%;background:rgba(255,255,255,.1);color:var(--ink);font-size:11px;line-height:18px;text-align:center}
+#choices{display:flex;flex-direction:column;gap:10px;width:min(100%,360px)}
+.card{display:grid;grid-template-columns:44px 1fr;gap:1px 12px;align-items:center;text-align:left;padding:13px 14px;border-radius:14px;background:rgba(24,18,48,.95);border:1px solid rgba(255,255,255,.16);box-shadow:0 6px 24px rgba(0,0,0,.5);animation:rise .35s both}
+.card:nth-child(2){animation-delay:.07s}.card:nth-child(3){animation-delay:.14s}
+.card:active{border-color:var(--gold);transform:scale(.98)}
+@keyframes rise{from{opacity:0;transform:translateY(18px)}}
+.card em{grid-row:1/3;font-style:normal;font-size:29px;text-align:center}
+.card b{font-size:16px}
+.card b small{float:right;color:var(--gold);font-size:10px;letter-spacing:2px;padding-top:4px}
+.card span{color:var(--dim);font-size:13px;line-height:1.3}
+#oScore{font-size:54px;line-height:1;font-weight:900;font-variant-numeric:tabular-nums;text-shadow:0 0 26px rgba(255,207,90,.6)}
+#oNew{color:#1a0b12;background:var(--gold);font-weight:800;font-size:11px;letter-spacing:.2em;padding:3px 10px;border-radius:99px;display:none}
+#oStats{display:grid;grid-template-columns:auto auto;gap:3px 18px;font-size:14px;text-align:left;color:var(--dim)}
+#oStats b{color:var(--ink);text-align:right;font-variant-numeric:tabular-nums}
+#oBoons{font-size:20px;letter-spacing:3px;min-height:26px;max-width:320px}
+#oBoons sup{font-size:10px;color:var(--gold);letter-spacing:0;margin-left:-2px}
+#oUnlock{color:var(--gold);font-size:14px;font-weight:600}
+</style>
+</head>
+<body>
+<div id="app">
+  <canvas id="c"></canvas>
+  <div id="vig"></div>
+  <div id="xp"><i></i></div>
+  <div id="hud">
+    <div id="hearts"></div>
+    <div id="mid"><b id="score">0</b><span id="lvl"></span></div>
+    <div id="time">0:00</div>
+  </div>
+  <div id="hint"></div>
+  <div id="hold">hold &amp; drag to fly · rest to slow time</div>
+  <div id="banner"><b></b><span></span></div>
+
+  <section id="title" class="screen on">
+    <h1 aria-label="Wyrmhole">WYRMH<i></i>LE</h1>
+    <p class="lore">The Hush is eating the stars.<br>You are the last wyrm of the old light.<br><b>Circle them. Bite your tail.<br>Let them fall out of the sky.</b></p>
+    <div id="forms"></div>
+    <p id="blurb"></p>
+    <button class="btn" id="fly">FLY</button>
+    <p id="best"></p>
+    <ol class="how"><li>Drag anywhere to fly</li><li>Cross your own tail to tear a wyrmhole</li><li>Swallow more at once to score far more</li></ol>
+  </section>
+
+  <section id="cards" class="screen">
+    <div class="tag">The wyrm grows</div>
+    <h2>Choose a boon</h2>
+    <div id="choices"></div>
+  </section>
+
+  <section id="over" class="screen">
+    <div class="tag" id="oTag"></div>
+    <b id="oScore">0</b>
+    <div id="oNew">NEW BEST</div>
+    <div id="oStats"></div>
+    <div id="oBoons"></div>
+    <div id="oUnlock"></div>
+    <button class="btn" id="again">AGAIN</button>
+    <button class="link" id="menu">change wyrm</button>
+  </section>
+
+  <button id="mute" aria-label="Toggle sound">♪</button>
+</div>
+<script>
+'use strict';
+//<SIM>  Pure game rules, no DOM. test.js runs exactly this block in Node.
+const W = 400, TAU = Math.PI * 2;
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const need = l => 8 + 14 * l; // swallowed "xp" needed for the next boon
+function rng(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+const FORMS = {
+  ember:    { name: 'Ember',     hue: 38,  tail: 1,    speed: 1,    hearts: 3, mult: 1, boons: {},           blurb: 'Balanced. Three hearts.' },
+  longfang: { name: 'Longfang',  hue: 160, tail: 1.4,  speed: .86,  hearts: 3, mult: 1, boons: {},           blurb: 'A huge tail on a heavy body.',    lock: 'Swallow 15 in one loop' },
+  storm:    { name: 'Stormcoil', hue: 205, tail: .85,  speed: 1.06, hearts: 3, mult: 1, boons: { fork: 2 },  blurb: 'Short tail. Born with lightning.', lock: 'Swallow an Eclipse' },
+  glass:    { name: 'Glasswyrm', hue: 285, tail: 1,    speed: 1.1,  hearts: 1, mult: 2, boons: { comet: 1 }, blurb: 'One heart. Double score.',         lock: 'Survive 3:00' },
+};
+const BOONS = { // d(l): description of level l
+  tail:    { icon: '〰️', name: 'Long Tail',     max: 5, d: () => 'Your tail grows 22% longer. Bigger loops.' },
+  swift:   { icon: '💨', name: 'Quicksilver',   max: 3, d: () => 'Fly 12% faster.' },
+  horizon: { icon: '🕳️', name: 'Event Horizon', max: 3, d: () => 'Wyrmholes stay open a second longer and swallow whatever strays in.' },
+  gravity: { icon: '🧲', name: 'Gravity Well',  max: 3, d: () => 'Open wyrmholes drag nearby Hush inside.' },
+  nova:    { icon: '💥', name: 'Supernova',     max: 3, d: l => `A wyrmhole that swallows ${7 - l}+ bursts as it closes.` },
+  ember:   { icon: '🔥', name: 'Ember Tail',    max: 3, d: l => 'Your tail burns whatever touches it' + (l > 1 ? ', faster.' : '.') },
+  fork:    { icon: '⚡', name: 'Forked Tongue', max: 3, d: l => `Every catch arcs lightning to ${l + 1} more Hush.` },
+  echo:    { icon: '👁️', name: 'Afterimage',    max: 2, d: l => l > 1 ? 'Every wyrmhole reopens twice.' : 'Every wyrmhole reopens a moment later.' },
+  comet:   { icon: '☄️', name: 'Comet Rush',    max: 3, d: l => `Catch 3+ in a loop and blaze for ${(1 + .6 * l).toFixed(1)}s: untouchable, ramming.` },
+  feast:   { icon: '🍷', name: 'Feast',         max: 2, d: l => `Swallow ${15 - 3 * l}+ in one wyrmhole to regrow a heart.` },
+  heart:   { icon: '💛', name: 'Heartseed',     max: 2, d: () => 'One more heart, filled.' },
+  crush:   { icon: '🗜️', name: 'Crushing Coil', max: 2, d: () => 'Loops crack one more layer of armour.' },
+  hubris:  { icon: '👑', name: 'Hubris',        max: 1, d: () => '+60% score. One heart lost for good.' },
+};
+const FOES = {
+  mote:    { r: 7,  hp: 1, val: 1,  xp: 1 }, // drifts
+  seeker:  { r: 7,  hp: 1, val: 1,  xp: 1 }, // hunts the head
+  darter:  { r: 6,  hp: 1, val: 3,  xp: 2 }, // aims, dashes, severs the tail
+  brute:   { r: 13, hp: 3, val: 5,  xp: 3 }, // armoured
+  spitter: { r: 8,  hp: 1, val: 3,  xp: 2 }, // keeps its distance, shoots
+  shear:   { r: 7,  hp: 1, val: 2,  xp: 2 }, // goes for the tail
+  anchor:  { r: 10, hp: 1, val: 8,  xp: 4 }, // a loop holding an anchor and anything else fails
+  eclipse: { r: 28, hp: 3, val: 50, xp: 0 }, // boss
+  shot:    { r: 4,  hp: 1, val: 1,  xp: 0 },
+};
+
+function segHit(p, q, a, b) { // where on p->q (0..1) it crosses a->b, or -1
+  const rx = q.x - p.x, ry = q.y - p.y, sx = b.x - a.x, sy = b.y - a.y, den = rx * sy - ry * sx;
+  if (Math.abs(den) < 1e-9) return -1;
+  const t = ((a.x - p.x) * sy - (a.y - p.y) * sx) / den, u = ((a.x - p.x) * ry - (a.y - p.y) * rx) / den;
+  return t >= 0 && t <= 1 && u >= 0 && u <= 1 ? t : -1;
+}
+function segDist(px, py, ax, ay, bx, by) {
+  const dx = bx - ax, dy = by - ay, l = dx * dx + dy * dy, t = l ? clamp(((px - ax) * dx + (py - ay) * dy) / l, 0, 1) : 0;
+  return Math.hypot(px - ax - dx * t, py - ay - dy * t);
+}
+function inPoly(P, x, y) { let c = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const a = P[i], b = P[j]; if ((a.y > y) !== (b.y > y) && x < (b.x - a.x) * (y - a.y) / (b.y - a.y) + a.x) c = !c; } return c; }
+function polyArea(P) { let s = 0; for (let i = 0, j = P.length - 1; i < P.length; j = i++) s += (P[j].x + P[i].x) * (P[j].y - P[i].y); return Math.abs(s) / 2; }
+function pathLen(T) { let l = 0; for (let i = 1; i < T.length; i++) l += Math.hypot(T[i].x - T[i - 1].x, T[i].y - T[i - 1].y); return l; }
+
+function createSim(seed, H = 720, form = 'ember') {
+  const f = FORMS[form], s = {
+    rnd: rng(seed), H, form, t: 0, x: W / 2, y: H * .6, wx: 0, wy: 0, ang: -Math.PI / 2, moved: 0,
+    trail: [{ x: W / 2, y: H * .6 }], len: 0, maxLen: 520 * f.tail, speed: 520 * f.speed,
+    hearts: f.hearts, maxHearts: f.hearts, mult: f.mult, inv: 0, rush: -9,
+    foes: [], holes: [], later: [], ev: [], boons: {}, choices: null, met: { mote: 1, shot: 1 },
+    score: 0, xp: 0, level: 0, eaten: 0, loops: 0, best: 0, slain: 0, bossN: 0,
+    spawn: 2, nextEvent: 26, nextBoss: 75, dawn: false, over: false, id: 0,
+  };
+  for (const b in f.boons) for (let i = 0; i < f.boons[b]; i++) applyBoon(s, b);
+  for (let i = 0; i < 5; i++) { // something to circle straight away
+    let x, y; do { x = 40 + s.rnd() * (W - 80); y = 60 + s.rnd() * (H - 120); } while (Math.hypot(x - s.x, y - s.y) < 90);
+    spawn(s, 'mote', x, y, { warm: .6 });
+  }
+  return s;
+}
+function applyBoon(s, id) {
+  s.boons[id] = (s.boons[id] || 0) + 1;
+  if (id === 'tail') s.maxLen *= 1.22;
+  if (id === 'swift') s.speed *= 1.12;
+  if (id === 'heart') { s.maxHearts++; s.hearts++; }
+  if (id === 'hubris') { s.mult *= 1.6; s.maxHearts--; s.hearts = Math.min(s.hearts, s.maxHearts); }
+}
+function offer(s) {
+  const ids = Object.keys(BOONS).filter(id => (s.boons[id] || 0) < BOONS[id].max && (s.maxHearts > 1 || id !== 'hubris' && id !== 'feast'));
+  for (let i = ids.length - 1; i > 0; i--) { const j = Math.floor(s.rnd() * (i + 1)); [ids[i], ids[j]] = [ids[j], ids[i]]; }
+  return ids.slice(0, 3);
+}
+function pick(s, i) { applyBoon(s, s.choices[i]); s.choices = null; }
+
+// Input: steer() adds a relative drag (touch), aim() points at a spot (mouse, bot).
+function steer(s, dx, dy) { s.wx += dx; s.wy += dy; const l = Math.hypot(s.wx, s.wy); if (l > 45) { s.wx *= 45 / l; s.wy *= 45 / l; } }
+function aim(s, x, y) { s.wx = x - s.x; s.wy = y - s.y; }
+
+function spawn(s, type, x, y, extra) {
+  const d = FOES[type], f = { id: ++s.id, type, x, y, vx: 0, vy: 0, kx: 0, ky: 0, r: d.r, hp: d.hp, val: d.val, a: s.rnd() * TAU, sp: 1, st: 0, tm: 2, age: 0, warm: 0, imm: 0, cd: 0, burn: 0, hot: false, dead: false };
+  if (!s.met[type]) { s.met[type] = 1; s.ev.push({ e: 'first', type }); }
+  s.foes.push(Object.assign(f, extra)); return f;
+}
+function edge(s) { // a point just outside the arena, away from the wyrm
+  for (let i = 0; ; i++) {
+    const u = s.rnd() * 2 * (W + s.H);
+    const p = u < W ? { x: u, y: -18 } : u < W + s.H ? { x: W + 18, y: u - W } : u < 2 * W + s.H ? { x: u - W - s.H, y: s.H + 18 } : { x: -18, y: u - 2 * W - s.H };
+    if (i > 6 || Math.hypot(p.x - s.x, p.y - s.y) > 150) return p;
+  }
+}
+
+function strike(s, f, h, dmg = 1) { // h: the wyrmhole doing it (kills feed its combo), or null
+  if (f.dead || f.imm > 0) return;
+  f.hp -= dmg;
+  if (f.hp > 0) { s.ev.push({ e: 'crack', x: f.x, y: f.y }); if (f.type === 'eclipse') { f.imm = .7; f.sp *= 1.18; } return; }
+  f.dead = true;
+  const k = h ? ++h.n : 1, pts = Math.round(f.val * k * 10 * s.mult); // the k-th thing down one hole is worth k times as much
+  s.score += pts;
+  if (h) { h.pts += pts; if (h.n > s.best) s.best = h.n; }
+  if (f.type !== 'shot') { s.eaten++; s.xp += FOES[f.type].xp; }
+  s.ev.push({ e: 'eat', f, k, h, pts });
+  if (f.type === 'eclipse') {
+    s.slain++; s.xp += need(s.level); if (!s.dawn && s.hearts < s.maxHearts) s.hearts++;
+    s.ev.push({ e: 'slain', x: f.x, y: f.y });
+    for (const g of s.foes) if (g.type !== 'anchor' && Math.hypot(g.x - f.x, g.y - f.y) < 230) strike(s, g, h);
+  }
+}
+function hurt(s) {
+  s.hearts--; s.inv = 1.6; s.ev.push({ e: 'hurt', x: s.x, y: s.y });
+  for (const f of s.foes) {
+    const dx = f.x - s.x, dy = f.y - s.y, d = Math.hypot(dx, dy) || 1;
+    if (d > 160) continue;
+    if (f.type === 'shot') f.dead = f.gone = true;
+    else { const p = 420 * (1 - d / 160); f.kx += dx / d * p; f.ky += dy / d * p; }
+  }
+  if (s.hearts <= 0) { s.over = true; s.ev.push({ e: 'over' }); }
+}
+function cutTrail(s, i) { const pts = s.trail.splice(0, i + 1); s.len = pathLen(s.trail); s.ev.push({ e: 'cut', pts }); }
+function nearTrail(s, x, y, rad, skip = 0) { // index of a tail point within rad, ignoring the newest `skip`
+  const T = s.trail, r2 = rad * rad;
+  for (let i = T.length - 1 - skip; i >= 0; i--) { const dx = T[i].x - x, dy = T[i].y - y; if (dx * dx + dy * dy < r2) return i; }
+  return -1;
+}
+
+function openHole(s, poly, gen) {
+  let x = 0, y = 0; for (const p of poly) { x += p.x; y += p.y; } x /= poly.length; y /= poly.length;
+  const inside = s.foes.filter(f => !f.dead && inPoly(poly, f.x, f.y));
+  if (inside.some(f => f.type === 'anchor') && inside.some(f => f.type !== 'anchor' && f.type !== 'shot')) { s.ev.push({ e: 'anchored', poly, x, y }); return; }
+  const h = { poly, x, y, r: Math.sqrt(polyArea(poly) / Math.PI), life: .3 + (s.boons.horizon || 0), t: 0, n: 0, pts: 0, seen: new Set(), gen, done: false };
+  s.holes.push(h); s.loops++; s.ev.push({ e: 'hole', h });
+  for (const f of inside) { h.seen.add(f.id); strike(s, f, h, 1 + (s.boons.crush || 0)); }
+  const fork = s.boons.fork || 0;
+  if (fork && h.n) {
+    const near = s.foes.filter(f => !f.dead && f.type !== 'anchor' && f.type !== 'shot' && !h.seen.has(f.id) && f.x > 0 && f.x < W && f.y > 0 && f.y < s.H)
+      .map(f => [Math.hypot(f.x - x, f.y - y), f]).filter(a => a[0] < 260).sort((a, b) => a[0] - b[0]).slice(0, fork + 1);
+    for (const [, f] of near) { s.ev.push({ e: 'bolt', x1: x, y1: y, x2: f.x, y2: f.y }); strike(s, f, h); }
+  }
+  if (s.boons.comet && h.n >= 3 && s.rush < -2) { s.rush = 1 + .6 * s.boons.comet; s.ev.push({ e: 'rush' }); } // 2s of cool-down: never permanent
+  if (gen < (s.boons.echo || 0)) s.later.push({ t: s.t + .9, poly, gen: gen + 1 });
+}
+function checkLoop(s) { // did the newest tail segment cross the older tail?
+  const T = s.trail, n = T.length; if (n < 8) return;
+  const p = T[n - 2], q = T[n - 1]; let bt = 2, bi = -1;
+  for (let i = 0; i < n - 4; i++) { const t = segHit(p, q, T[i], T[i + 1]); if (t >= 0 && t < bt) { bt = t; bi = i; } }
+  if (bi < 0) return;
+  const X = { x: p.x + (q.x - p.x) * bt, y: p.y + (q.y - p.y) * bt }, poly = [X, ...T.slice(bi + 1, n - 1)];
+  if (polyArea(poly) < 220) return;
+  s.trail = [...T.slice(0, bi + 1), X, q]; s.len = pathLen(s.trail); // the loop is shed, the rest of the tail stays
+  openHole(s, poly, 0);
+}
+function moveHead(s, dt) {
+  const wl = Math.hypot(s.wx, s.wy);
+  if (wl > .01) {
+    const m = Math.min(wl, s.speed * dt), ux = s.wx / wl, uy = s.wy / wl;
+    s.x = clamp(s.x + ux * m, 8, W - 8); s.y = clamp(s.y + uy * m, 8, s.H - 8);
+    s.wx -= ux * m; s.wy -= uy * m; s.ang = Math.atan2(uy, ux); s.moved += m;
+  }
+  const T = s.trail, last = T[T.length - 1], d = Math.hypot(s.x - last.x, s.y - last.y);
+  if (d < 4) return;
+  T.push({ x: s.x, y: s.y }); s.len += d; checkLoop(s);
+  while (s.len > s.maxLen && s.trail.length > 2) { const a = s.trail[0], b = s.trail[1]; s.len -= Math.hypot(b.x - a.x, b.y - a.y); s.trail.shift(); }
+}
+
+function direct(s, dt) { // the spawn director: what arrives, and when
+  const t = s.t, F = s.foes, n = {}; for (const f of F) n[f.type] = (n[f.type] || 0) + 1;
+  s.spawn -= dt * (n.eclipse ? .6 : 1);
+  if (s.spawn <= 0) {
+    s.spawn += 1 / Math.min(7 + Math.max(0, t - 420) / 40, .75 + t / 50); // after dawn (7:00) the cap keeps rising: no build lasts for ever
+    if (F.length < 150) {
+      const w = {
+        mote: Math.max(.12, 1 - t / 50), seeker: clamp((t - 12) / 30, 0, 1.2),
+        darter: t > 45 && (n.darter || 0) < 1 + t / 120 ? .09 : 0, brute: t > 70 ? .08 : 0,
+        spitter: t > 100 && (n.spitter || 0) < 2 + t / 150 ? .07 : 0, shear: t > 130 && (n.shear || 0) < 3 ? .06 : 0,
+        anchor: t > 160 && (n.anchor || 0) < 2 + Math.max(0, t - 420) / 40 ? (t > 420 ? .12 : .035) : 0, // after dawn they multiply, and no boon moves an anchor
+      };
+      let sum = 0; for (const k in w) sum += w[k];
+      let r = s.rnd() * sum, type = 'mote'; for (const k in w) if ((r -= w[k]) < 0) { type = k; break; }
+      if (type === 'anchor') { // dropped into the arena, far enough from the walls to be circled
+        let x, y, i = 0; do { x = 70 + s.rnd() * (W - 140); y = 70 + s.rnd() * (s.H - 140); } while (Math.hypot(x - s.x, y - s.y) < 110 && ++i < 9);
+        spawn(s, 'anchor', x, y, { warm: 1 });
+      } else { const p = edge(s); spawn(s, type, p.x, p.y, { sp: .85 + s.rnd() * .3 }); }
+    }
+  }
+  if (t >= s.nextEvent) {
+    s.nextEvent = t + 19 + s.rnd() * 9;
+    if (t > 60 && s.rnd() < .35) { // a ring closes in around the wyrm
+      const k = 10 + Math.min(8, t / 40 | 0), a0 = s.rnd() * TAU;
+      for (let i = 0; i < k; i++) spawn(s, 'seeker', s.x + Math.cos(a0 + i * TAU / k) * 165, s.y + Math.sin(a0 + i * TAU / k) * 165, { warm: 1.1, sp: .8 });
+      s.ev.push({ e: 'event', kind: 'ring', x: s.x, y: s.y });
+    } else { // a swarm pours in from one side
+      const p = edge(s), k = Math.min(22, 7 + t / 22 | 0);
+      for (let i = 0; i < k; i++) spawn(s, 'seeker', p.x + (s.rnd() - .5) * 70, p.y + (s.rnd() - .5) * 70, { sp: .9 + s.rnd() * .2 });
+      s.ev.push({ e: 'event', kind: 'swarm', x: p.x, y: p.y });
+    }
+  }
+  if (t >= s.nextBoss && !n.eclipse) { s.nextBoss = t + 100; spawn(s, 'eclipse', W / 2, -40, { hp: 3 + s.bossN++, tm: 3 }); s.ev.push({ e: 'boss' }); }
+  if (!s.dawn && t >= 420) { s.dawn = true; s.hearts = s.maxHearts; s.score += Math.round(5000 * s.hearts * s.mult); s.ev.push({ e: 'dawn' }); } // the goal. Past it nothing heals, so every night ends
+}
+
+function chase(f, ux, uy, acc, top, dt) { f.vx += ux * acc * dt; f.vy += uy * acc * dt; const v = Math.hypot(f.vx, f.vy); if (v > top) { f.vx *= top / v; f.vy *= top / v; } }
+function stepFoes(s, dt) {
+  const F = s.foes, H = s.H, px = s.x, py = s.y, ramp = Math.min(s.t, 400) + Math.max(0, s.t - 420) * .6, ember = s.boons.ember || 0, decay = Math.exp(-5 * dt);
+  for (let i = 0; i < F.length; i++) {
+    const f = F[i]; if (f.dead) continue;
+    f.age += dt; if (f.imm > 0) f.imm -= dt; if (f.cd > 0) f.cd -= dt;
+    if (f.warm > 0) { f.warm -= dt; continue; }
+    const dx = px - f.x, dy = py - f.y, d = Math.hypot(dx, dy) || 1, ux = dx / d, uy = dy / d, x0 = f.x, y0 = f.y;
+    switch (f.type) {
+      case 'mote': f.a += (s.rnd() - .5) * 3 * dt; f.vx = (Math.cos(f.a) * .75 + ux * .4) * 24 * f.sp; f.vy = (Math.sin(f.a) * .75 + uy * .4) * 24 * f.sp; break;
+      case 'anchor': f.a += (s.rnd() - .5) * 2 * dt; f.vx = Math.cos(f.a) * 9; f.vy = Math.sin(f.a) * 9; break;
+      case 'seeker': chase(f, ux, uy, 240, (46 + ramp * .13) * f.sp, dt); break;
+      case 'brute': chase(f, ux, uy, 90, (26 + ramp * .03) * f.sp, dt); break;
+      case 'eclipse':
+        chase(f, ux, uy, 60, 22 * f.sp, dt); f.tm -= dt;
+        if (f.tm <= 0) { f.tm = 4.5; for (let k = 0; k < 3; k++) { const a = s.rnd() * TAU; spawn(s, 'seeker', f.x + Math.cos(a) * 44, f.y + Math.sin(a) * 44, { warm: .5 }); } s.ev.push({ e: 'brood', x: f.x, y: f.y }); }
+        break;
+      case 'spitter': {
+        const to = d > 190 ? 1 : d < 130 ? -1 : 0, side = (f.id & 1 ? 1 : -1) * (to ? .3 : 1);
+        f.vx = (ux * to - uy * side) * 44; f.vy = (uy * to + ux * side) * 44; f.tm -= dt;
+        if (f.tm <= 0 && f.x > 0 && f.x < W && f.y > 0 && f.y < H) { f.tm = 3; spawn(s, 'shot', f.x, f.y, { vx: ux * 115, vy: uy * 115, tm: 4.5 }); s.ev.push({ e: 'spit' }); }
+        break;
+      }
+      case 'shot': f.tm -= dt; if (f.tm <= 0) f.dead = f.gone = true; break;
+      case 'shear': {
+        const T = s.trail;
+        if (f.st === 1) { f.vx = -ux * 40; f.vy = -uy * 40; f.tm -= dt; if (f.tm <= 0) f.st = 0; }
+        else if (T.length > 16) {
+          const p = T[T.length >> 1], ex = p.x - f.x, ey = p.y - f.y, ed = Math.hypot(ex, ey) || 1; f.vx = ex / ed * 92; f.vy = ey / ed * 92;
+          const hit = nearTrail(s, f.x, f.y, f.r + 3, 8); if (hit >= 0) { cutTrail(s, hit); f.st = 1; f.tm = 2.4; }
+        } else chase(f, ux, uy, 120, 45, dt);
+        break;
+      }
+      case 'darter':
+        if (f.st === 0) { // glide to a perch inside the arena
+          const ex = clamp(f.x, 50, W - 50) - f.x, ey = clamp(f.y, 50, H - 50) - f.y, ed = Math.hypot(ex, ey);
+          if (ed < 4) { f.st = 1; f.tm = 1.1; f.vx = f.vy = 0; s.ev.push({ e: 'aim' }); } else { f.vx = ex / ed * 130; f.vy = ey / ed * 130; }
+        } else if (f.st === 1) { // aim: tracks, then locks for the last 0.3s
+          f.tm -= dt; if (f.tm > .3) f.a = Math.atan2(dy, dx);
+          if (f.tm <= 0) { f.st = 2; f.tm = 0; f.vx = Math.cos(f.a) * 540; f.vy = Math.sin(f.a) * 540; s.ev.push({ e: 'dash' }); }
+        } else { f.tm += dt; if (f.tm > .12 && (f.x < 30 || f.x > W - 30 || f.y < 30 || f.y > H - 30)) { f.st = 0; f.vx = f.vy = 0; } }
+        break;
+    }
+    if ((f.type === 'mote' || f.type === 'anchor') && (f.x < 60 || f.x > W - 60 || f.y < 60 || f.y > H - 60)) { // wanderers turn back at the walls
+      const m = f.type === 'anchor' ? 55 : 12; if (f.x < m || f.x > W - m || f.y < m || f.y > H - m) f.a = Math.atan2(H / 2 - f.y, W / 2 - f.x);
+    }
+    f.x += (f.vx + f.kx) * dt; f.y += (f.vy + f.ky) * dt; f.kx *= decay; f.ky *= decay;
+    if (f.type === 'shot' && (f.x < -30 || f.x > W + 30 || f.y < -30 || f.y > H + 30)) f.dead = f.gone = true;
+    const dash = f.type === 'darter' && f.st === 2;
+    if (dash) { // a dashing darter severs the tail where it crosses it
+      const T = s.trail, a = { x: x0, y: y0 }; let cut = -1;
+      for (let j = T.length - 2; j >= 0 && cut < 0; j--) if (segHit(a, f, T[j], T[j + 1]) >= 0) cut = j;
+      if (cut >= 0) cutTrail(s, cut);
+    }
+    if (f.dead) continue;
+    f.hot = ember > 0 && f.type !== 'anchor' && f.type !== 'shot' && nearTrail(s, f.x, f.y, f.r + 5) >= 0;
+    if (f.hot && (f.burn += dt * ember) >= .6) { f.burn = 0; strike(s, f, null); if (f.dead) continue; }
+    if ((dash ? segDist(s.x, s.y, x0, y0, f.x, f.y) : Math.hypot(s.x - f.x, s.y - f.y)) < f.r + 5) {
+      if (s.rush > 0) { if (f.type !== 'anchor' && f.cd <= 0) { f.cd = .35; strike(s, f, null); } }
+      else if (s.inv <= 0 && !s.over) { if (f.type === 'shot') f.dead = f.gone = true; hurt(s); }
+    }
+  }
+  for (let i = 0; i < F.length; i++) { // bodies push each other apart, so a herd is a clump, not a dot
+    const a = F[i]; if (a.dead || a.warm > 0 || a.type === 'shot' || a.type === 'darter') continue;
+    for (let j = i + 1; j < F.length; j++) {
+      const b = F[j]; if (b.dead || b.warm > 0 || b.type === 'shot' || b.type === 'darter') continue;
+      const dx = b.x - a.x, dy = b.y - a.y, rr = a.r + b.r, d2 = dx * dx + dy * dy;
+      if (d2 >= rr * rr || d2 === 0) continue;
+      const d = Math.sqrt(d2), o = (rr - d) / d, wa = b.r / rr, wb = a.r / rr; // the bigger one moves less
+      a.x -= dx * o * wa; a.y -= dy * o * wa; b.x += dx * o * wb; b.y += dy * o * wb;
+    }
+  }
+}
+function stepHoles(s, dt) {
+  const g = s.boons.gravity || 0, dmg = 1 + (s.boons.crush || 0);
+  for (const h of s.holes) {
+    h.t += dt;
+    if (h.t < h.life) { // still open: swallows what strays in, and Gravity Well drags the neighbours
+      for (const f of s.foes) {
+        if (f.dead || f.type === 'anchor' || h.seen.has(f.id)) continue;
+        if (inPoly(h.poly, f.x, f.y)) { h.seen.add(f.id); strike(s, f, h, dmg); }
+        else if (g && f.type !== 'eclipse') { const dx = h.x - f.x, dy = h.y - f.y, d = Math.hypot(dx, dy) || 1; if (d < h.r + 30 + 28 * g) { f.x += dx / d * 300 * dt; f.y += dy / d * 300 * dt; } }
+      }
+    } else if (!h.done) {
+      h.done = true;
+      const nv = s.boons.nova || 0, fe = s.boons.feast || 0;
+      if (nv && h.n >= 7 - nv) {
+        const R = h.r + 45 + 25 * nv; s.ev.push({ e: 'nova', x: h.x, y: h.y, R });
+        for (const f of s.foes) { if (f.dead || f.type === 'anchor') continue; const dx = f.x - h.x, dy = f.y - h.y, d = Math.hypot(dx, dy) || 1; if (d < R) { strike(s, f, h); f.kx += dx / d * 200; f.ky += dy / d * 200; } }
+      }
+      if (fe && !s.dawn && h.n >= 15 - 3 * fe && s.hearts < s.maxHearts) { s.hearts++; s.ev.push({ e: 'heal' }); }
+      s.ev.push({ e: 'close', h });
+    }
+  }
+  s.holes = s.holes.filter(h => h.t < h.life + .5); // kept half a second longer so it can be drawn closing
+}
+
+function stepSim(s, dt) {
+  s.ev.length = 0; // events of this step, for the renderer and the sound
+  if (s.over || s.choices) return;
+  s.t += dt; if (s.inv > 0) s.inv -= dt; s.rush -= dt;
+  moveHead(s, dt); direct(s, dt); stepFoes(s, dt); stepHoles(s, dt);
+  for (const l of s.later) if (s.t >= l.t) { l.done = true; openHole(s, l.poly, l.gen); }
+  s.later = s.later.filter(l => !l.done);
+  s.foes = s.foes.filter(f => !f.dead);
+  if (!s.over && s.xp >= need(s.level)) {
+    s.xp -= need(s.level); s.level++;
+    const c = offer(s); if (c.length) { s.choices = c; s.ev.push({ e: 'level' }); } else s.score += 2000;
+  }
+}
+
+function bot(s) { // a simple player: circles the nearest Hush. Flies the title screen and the tests.
+  let near = null, nd = 1e9, fx = 0, fy = 0;
+  for (const f of s.foes) {
+    if (f.warm > 0) continue;
+    const dx = f.x - s.x, dy = f.y - s.y, d = Math.hypot(dx, dy) || 1, safe = f.r + (f.type === 'shot' || f.type === 'darter' ? 40 : 22);
+    if (d < safe) { fx -= dx / d * (safe - d); fy -= dy / d * (safe - d); }
+    if (f.type !== 'anchor' && f.type !== 'shot' && f.x > 30 && f.x < W - 30 && f.y > 30 && f.y < s.H - 30 && d < nd) { nd = d; near = f; }
+  }
+  if (!near) return aim(s, W / 2 + Math.cos(s.t) * 70 + fx * 9, s.H / 2 + Math.sin(s.t) * 70 + fy * 9);
+  const R = clamp(near.r + 34, 40, s.maxLen / 8), dx = s.x - near.x, dy = s.y - near.y, d = Math.hypot(dx, dy) || 1, rad = clamp((R - d) / R, -1, 1) * 1.6;
+  const vx = -dy / d + dx / d * rad + fx * .15, vy = dx / d + dy / d * rad + fy * .15, l = Math.hypot(vx, vy) || 1;
+  aim(s, s.x + vx / l * 60, s.y + vy / l * 60);
+}
+//</SIM>
+
+// ---------- save ----------
+const $ = id => document.getElementById(id);
+const save = { best: 0, time: 0, un: ['ember'], mute: false, runs: 0, form: 'ember' };
+try { Object.assign(save, JSON.parse(localStorage.getItem('wyrmhole') || '{}')); } catch (e) { /* private mode: play without saving */ }
+const store = () => { try { localStorage.setItem('wyrmhole', JSON.stringify(save)); } catch (e) { /* ditto */ } };
+if (!FORMS[save.form] || !save.un.includes(save.form)) save.form = 'ember';
+
+// ---------- sound: everything is synthesised, no files ----------
+let AC = null, aOut, aSfx, aMus, aEcho, aNoise, mStep = 0, mNext = 0, inten = 0;
+const mtof = m => 440 * 2 ** ((m - 69) / 12), CHORDS = [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62]], PENT = [0, 3, 5, 7, 10];
+function audio() { // must first run inside a tap
+  if (AC) { if (AC.state === 'suspended' && !document.hidden) AC.resume(); return; }
+  const C = window.AudioContext || window.webkitAudioContext; if (!C) return;
+  AC = new C();
+  const comp = AC.createDynamicsCompressor(), dl = AC.createDelay(1), fb = AC.createGain(), lp = AC.createBiquadFilter(), gain = v => { const n = AC.createGain(); n.gain.value = v; return n; };
+  aOut = gain(save.mute ? 0 : .9); aOut.connect(comp); comp.connect(AC.destination);
+  aSfx = gain(.9); aSfx.connect(aOut); aMus = gain(.55); aMus.connect(aOut);
+  aEcho = gain(.5); dl.delayTime.value = .31; fb.gain.value = .36; lp.frequency.value = 2400;
+  aEcho.connect(dl); dl.connect(lp); lp.connect(fb); fb.connect(dl); lp.connect(aOut);
+  aNoise = AC.createBuffer(1, AC.sampleRate, AC.sampleRate); const d = aNoise.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  setInterval(music, 40);
+}
+function env(node, t, dur, vol, att, dest, wet) {
+  const v = AC.createGain(); v.gain.setValueAtTime(.0001, t); v.gain.exponentialRampToValueAtTime(vol, t + att); v.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  node.connect(v); v.connect(dest); if (wet) { const w = AC.createGain(); w.gain.value = wet; v.connect(w); w.connect(aEcho); }
+}
+function tone(f, t, dur, vol, type = 'sine', f2 = 0, wet = 0, dest = aSfx, att = .006) {
+  const o = AC.createOscillator(); o.type = type; o.frequency.setValueAtTime(f, t); if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+  env(o, t, dur, vol, att, dest, wet); o.start(t); o.stop(t + dur + .05);
+}
+function hiss(t, dur, vol, freq, type = 'bandpass', dest = aSfx) {
+  const n = AC.createBufferSource(), b = AC.createBiquadFilter(); n.buffer = aNoise; n.loop = true; b.type = type; b.frequency.value = freq; n.connect(b);
+  env(b, t, dur, vol, .005, dest, 0); n.start(t); n.stop(t + dur + .05);
+}
+function music() { // a 16-step sequencer that adds layers as the night fills up (inten 0..4)
+  if (!AC || AC.state !== 'running') return;
+  if (mNext < AC.currentTime) mNext = AC.currentTime + .05;
+  while (mNext < AC.currentTime + .16) {
+    const I = inten, sl = 60 / (94 + I * 7) / 4, s16 = mStep % 16, ch = CHORDS[(mStep >> 4) % 4], t = mNext;
+    if (s16 === 0) { for (const n of ch) tone(mtof(n), t, sl * 17, .045, 'triangle', 0, .4, aMus, .5); tone(mtof(ch[0] - 12), t, sl * 17, .07, 'sine', 0, 0, aMus, .4); }
+    if (I >= 1 && (s16 === 0 || s16 === 6 || s16 === 8 || s16 === 14)) tone(mtof(ch[0] - 24), t, sl * 3, .2, 'triangle', 0, 0, aMus);
+    if (I >= 2 && s16 % 4 === 2) hiss(t, .05, .05, 7000, 'highpass', aMus);
+    if (I >= 3 && s16 % 4 === 0) tone(140, t, .17, .34, 'sine', 42, 0, aMus);
+    if (I >= 4 && s16 % 2 === 1) hiss(t, .03, .025, 9000, 'highpass', aMus);
+    if (s16 % (I >= 3 ? 1 : I >= 1 ? 2 : 4) === 0) tone(mtof(ch[[0, 1, 2, 1, 0, 2, 1, 2][(mStep >> (I >= 3 ? 0 : 1)) % 8]] + 12 + (s16 >= 8 && I >= 2 ? 12 : 0)), t, sl * 2, .05, I >= 3 ? 'triangle' : 'sine', 0, .6, aMus);
+    mNext += sl; mStep++;
+  }
+}
+const SFX = { // name: (T = when it starts, arg)
+  loop: (T, n) => { tone(260 - Math.min(n, 20) * 6, T, .32, .3, 'sine', 48); hiss(T, .22, .1, 900); },
+  pop: (T, k) => { const m = 57 + PENT[k % 5] + 12 * Math.min(3, k / 5 | 0); tone(mtof(m), T, .24, .13, 'triangle', 0, .35); tone(mtof(m + 12), T, .1, .05); }, // each swallow one step up the scale
+  hurt: T => { hiss(T, .45, .5, 320, 'lowpass'); tone(190, T, .5, .32, 'sawtooth', 40); },
+  level: T => [0, 4, 7, 12, 16].forEach((n, i) => tone(mtof(69 + n), T + i * .07, .3, .1, 'triangle', 0, .5)),
+  pick: T => { tone(mtof(76), T, .15, .1, 'triangle', 0, .4); tone(mtof(81), T + .07, .25, .1, 'triangle', 0, .4); },
+  anchored: T => { tone(196, T, .28, .16, 'square', 180); tone(277, T, .28, .12, 'square', 255); },
+  aim: T => tone(620, T, .2, .05, 'square', 1250),
+  dash: T => hiss(T, .22, .14, 3200),
+  cut: T => tone(950, T, .14, .12, 'sawtooth', 190),
+  bolt: T => { tone(1900, T, .12, .07, 'sawtooth', 180); hiss(T, .08, .08, 5000, 'highpass'); },
+  nova: T => { tone(130, T, .7, .4, 'sine', 30); hiss(T, .5, .3, 500, 'lowpass'); },
+  crack: T => tone(330, T, .1, .14, 'square', 160),
+  spit: T => tone(520, T, .1, .04, 'sine', 240),
+  heal: T => { tone(mtof(76), T, .2, .1, 'sine', 0, .5); tone(mtof(83), T + .1, .4, .1, 'sine', 0, .5); },
+  rush: T => tone(300, T, .35, .1, 'sawtooth', 1200),
+  boss: T => { tone(55, T, 2.4, .3, 'sawtooth', 41); tone(58.3, T, 2.4, .22, 'sawtooth', 43); },
+  slain: T => { SFX.nova(T); [0, 7, 12, 19, 24].forEach((n, i) => tone(mtof(57 + n), T + i * .09, .6, .12, 'triangle', 0, .6)); },
+  dawn: T => [0, 4, 7, 11, 14].forEach((n, i) => tone(mtof(60 + n), T + i * .12, 2, .1, 'triangle', 0, .6, aSfx, .2)),
+  over: T => [12, 7, 3, 0].forEach((n, i) => tone(mtof(57 + n), T + i * .22, .7, .13, 'triangle', 0, .6)),
+};
+function snd(name, arg, delay = 0) { if (AC && AC.state === 'running' && state !== 'title') SFX[name](AC.currentTime + delay, arg); }
+const buzz = ms => { try { navigator.vibrate && navigator.vibrate(ms); } catch (e) { /* not allowed, never mind */ } };
+
+// ---------- view ----------
+const cv = $('c'), g = cv.getContext('2d'), app = $('app'), bg = document.createElement('canvas');
+let sim, state = 'title', form = save.form;
+let vw = 1, vh = 1, dpr = 1, sc = 1, ox = 0, oy = 0, bgPh = -1;
+let held = false, touch = null, mouse = null, lx = 0, ly = 0;
+let clock = 0, last = 0, ts = 1, freeze = 0, shake = 0, flash = 0, red = 0, shown = 0, headAng = -1.57, cardsAt = 0, overAt = 0, hintStep = 9, hintT = 0;
+const P = [], ghosts = [], texts = [], rings = [], bolts = [], fizz = [], sprites = {};
+const COL = { mote: '#b98cff', seeker: '#ff4d7e', darter: '#ffd84a', brute: '#ff9148', spitter: '#7dff8a', shot: '#7dff8a', shear: '#58e6ff', anchor: '#a9bbdc', eclipse: '#ffe9c4' };
+const MEET = {
+  seeker: ['SEEKERS', 'They hunt you. Herd them, then circle.'], darter: ['DARTERS', 'They sever your tail. Catch them while they aim.'],
+  brute: ['BRUTES', 'Armoured. Circle them again and again.'], spitter: ['SPITTERS', 'Their shots can be swallowed too.'],
+  shear: ['SHEARS', 'They come for your tail.'], anchor: ['ANCHORS', 'Circle one alone, or the loop fails.'],
+};
+const CALL = [[40, 'WORLD-EATER'], [25, 'SINGULARITY'], [16, 'GLUTTON'], [10, 'FEAST'], [6, 'NICE']];
+const HINTS = ['Drag anywhere to fly', 'Cross your own tail to close a loop around them', 'Catch more in one loop for a far bigger score'];
+const fmt = t => (t / 60 | 0) + ':' + String(t % 60 | 0).padStart(2, '0'), num = n => Math.round(n).toLocaleString('en-US');
+const worldH = () => Math.round(clamp(W * vh / vw, 560, 900));
+
+function resize() {
+  dpr = Math.min(2, window.devicePixelRatio || 1); vw = cv.clientWidth || 1; vh = cv.clientHeight || 1;
+  cv.width = vw * dpr; cv.height = vh * dpr;
+  if (state === 'title') attract(); else fit();
+}
+function fit() { sc = Math.min(vw / W, vh / sim.H); ox = (vw - W * sc) / 2; oy = (vh - sim.H * sc) / 2; bgPh = -1; }
+function paintBg(ph) { // the sky: repainted once a minute as the night deepens
+  const H = sim.H, q = bg.getContext('2d'), r = rng(11 + ph), dawn = ph === 99, hue = dawn ? 24 : [252, 268, 292, 222, 196, 318, 340][Math.min(ph, 6)];
+  bg.width = W * 2; bg.height = H * 2; q.scale(2, 2);
+  const gr = q.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, `hsl(${hue - 25},45%,6%)`); gr.addColorStop(1, `hsl(${hue},${dawn ? 70 : 50}%,${dawn ? 20 : 4}%)`);
+  q.fillStyle = gr; q.fillRect(0, 0, W, H);
+  for (let i = 0; i < 4; i++) { const x = r() * W, y = r() * H, R = 130 + r() * 170, n = q.createRadialGradient(x, y, 0, x, y, R); n.addColorStop(0, `hsla(${hue + r() * 80 - 20},70%,45%,.17)`); n.addColorStop(1, 'transparent'); q.fillStyle = n; q.fillRect(0, 0, W, H); }
+  for (let i = 0; i < 150; i++) { q.fillStyle = `rgba(255,255,255,${.12 + r() * .6})`; const z = r() < .1 ? 1.6 : .8; q.fillRect(r() * W, r() * H, z, z); }
+}
+function glow(x, y, R, c, a = 1) { // a soft additive blob, cached per colour
+  let s = sprites[c];
+  if (!s) { s = sprites[c] = document.createElement('canvas'); s.width = s.height = 64; const q = s.getContext('2d'), gr = q.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, c); gr.addColorStop(1, 'transparent'); q.fillStyle = gr; q.fillRect(0, 0, 64, 64); }
+  const al = g.globalAlpha, op = g.globalCompositeOperation; g.globalAlpha = al * a; g.globalCompositeOperation = 'lighter'; g.drawImage(s, x - R, y - R, R * 2, R * 2); g.globalAlpha = al; g.globalCompositeOperation = op;
+}
+function burst(x, y, c, n, sp = 120, life = .5, size = 2.4) {
+  for (let i = 0; i < n && P.length < 500; i++) { const a = Math.random() * TAU, v = sp * (.25 + Math.random() * .75); P.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, t: 0, life: life * (.5 + Math.random() * .5), c, s: size }); }
+}
+const say = (x, y, s, c, z, life = 1.1) => texts.push({ x: clamp(x, 50, W - 50), y: clamp(y, 40, sim.H - 30), s, c, z, t: 0, life });
+function banner(a, b) { const el = $('banner'); el.firstChild.textContent = a; el.lastChild.textContent = b || ''; el.classList.remove('go'); void el.offsetWidth; el.classList.add('go'); }
+
+function drawFoe(f, k = 1) {
+  const c = COL[f.type], r = f.r * k;
+  g.globalAlpha = f.warm > 0 ? .25 + .25 * Math.sin(clock * 25) : 1;
+  glow(f.x, f.y, r * 3.2, c, f.hot ? .9 : .5);
+  if (f.type === 'darter' && f.st === 1) { // where it is about to dash
+    g.globalAlpha = .25 + .6 * (1 - f.tm / 1.1); g.strokeStyle = c; g.lineWidth = f.tm < .3 ? 2.2 : 1; g.setLineDash([6, 8]);
+    g.beginPath(); g.moveTo(f.x, f.y); g.lineTo(f.x + Math.cos(f.a) * 1000, f.y + Math.sin(f.a) * 1000); g.stroke(); g.setLineDash([]); g.globalAlpha = 1;
+  }
+  g.save(); g.translate(f.x, f.y); g.lineWidth = 2; g.lineJoin = 'round'; g.strokeStyle = c; g.fillStyle = '#0a0716'; g.beginPath();
+  switch (f.type) {
+    case 'mote': g.arc(0, 0, r * (1 + .08 * Math.sin(f.age * 5 + f.id)), 0, TAU); g.fill(); g.stroke(); g.beginPath(); g.fillStyle = c; g.arc(0, 0, r * .3, 0, TAU); g.fill(); break;
+    case 'seeker': g.rotate(Math.atan2(f.vy, f.vx)); g.moveTo(r * 1.4, 0); g.lineTo(-r, r * .9); g.lineTo(-r * .45, 0); g.lineTo(-r, -r * .9); g.closePath(); g.fill(); g.stroke(); break;
+    case 'darter': g.rotate(f.a); if (f.st === 2) g.fillStyle = c; g.moveTo(r * 2.2, 0); g.lineTo(0, r * .7); g.lineTo(-r * 1.3, 0); g.lineTo(0, -r * .7); g.closePath(); g.fill(); g.stroke(); break;
+    case 'brute':
+      g.rotate(f.age * .5); for (let i = 0; i < 6; i++) g.lineTo(Math.cos(i * TAU / 6) * r, Math.sin(i * TAU / 6) * r); g.closePath(); g.fill(); g.lineWidth = 2.5; g.stroke();
+      g.lineWidth = 1.5; for (let i = 1; i < f.hp; i++) { g.beginPath(); g.arc(0, 0, r * .3 * i, 0, TAU); g.stroke(); } // one ring per layer of armour left
+      break;
+    case 'spitter': g.arc(0, 0, r, 0, TAU); g.fill(); for (let i = 0; i < 4; i++) { const a = f.age + i * TAU / 4; g.moveTo(Math.cos(a) * r, Math.sin(a) * r); g.lineTo(Math.cos(a) * r * 1.6, Math.sin(a) * r * 1.6); } g.stroke(); g.beginPath(); g.fillStyle = c; g.arc(0, 0, r * clamp(1 - f.tm / 3, .15, .7), 0, TAU); g.fill(); break;
+    case 'shot': g.fillStyle = c; g.arc(0, 0, r, 0, TAU); g.fill(); break;
+    case 'shear': g.rotate(f.age * (f.st ? 3 : 9)); g.moveTo(-r * 1.3, -r * .5); g.lineTo(r * 1.3, r * .5); g.moveTo(-r * 1.3, r * .5); g.lineTo(r * 1.3, -r * .5); g.lineWidth = 2.5; g.stroke(); g.beginPath(); g.fillStyle = c; g.arc(0, 0, r * .35, 0, TAU); g.fill(); break;
+    case 'anchor': g.rotate(Math.PI / 4 + Math.sin(f.age) * .15); g.rect(-r * .85, -r * .85, r * 1.7, r * 1.7); g.fill(); g.lineWidth = 3; g.stroke(); g.fillStyle = c; g.fillRect(-r * .3, -r * .3, r * .6, r * .6); break;
+    case 'eclipse':
+      g.fillStyle = '#000'; g.arc(0, 0, r, 0, TAU); g.fill(); g.lineWidth = 3; g.strokeStyle = f.imm > 0 ? '#fff' : c; g.stroke();
+      g.lineWidth = 1.5; g.beginPath();
+      for (let i = 0; i < 18; i++) { const a = i * TAU / 18 + f.age * .3, l = r * (1.3 + .22 * Math.sin(f.age * 3 + i * 2)); g.moveTo(Math.cos(a) * r * 1.1, Math.sin(a) * r * 1.1); g.lineTo(Math.cos(a) * l, Math.sin(a) * l); }
+      g.stroke(); g.fillStyle = c;
+      for (let i = 0; i < f.hp; i++) { const a = -Math.PI / 2 + (i - (f.hp - 1) / 2) * .5; g.beginPath(); g.arc(Math.cos(a) * r * .55, Math.sin(a) * r * .55, 3, 0, TAU); g.fill(); } // armour left
+      break;
+  }
+  g.restore(); g.globalAlpha = 1;
+}
+function drawHole(h) {
+  const cl = h.t > h.life ? (h.t - h.life) / .5 : 0, k = Math.max(.02, 1 - cl * cl), hue = FORMS[sim.form].hue;
+  g.save(); g.translate(h.x, h.y); g.scale(k, k); g.rotate(cl * 1.5); g.translate(-h.x, -h.y);
+  g.beginPath(); for (const p of h.poly) g.lineTo(p.x, p.y); g.closePath();
+  g.fillStyle = 'rgba(0,0,0,.93)'; g.fill();
+  g.save(); g.clip(); glow(h.x, h.y, h.r * 1.2, `hsl(${hue + 200},90%,60%)`, .4); g.fillStyle = '#fff'; // another sky, seen through the hole
+  for (let i = 0; i < 9; i++) { const a = i * 2.4 + h.t * 1.3 + h.r, rr = h.r * (.12 + .09 * i); g.fillRect(h.x + Math.cos(a) * rr - .7, h.y + Math.sin(a) * rr - .7, 1.4, 1.4); }
+  g.restore();
+  g.globalCompositeOperation = 'lighter'; g.lineJoin = 'round'; g.lineWidth = 2.5 / k; g.strokeStyle = h.gen ? `hsl(${hue + 180},100%,75%)` : '#fff'; g.stroke();
+  if (h.t < .15) { g.globalAlpha = (1 - h.t / .15) * .7; g.fillStyle = '#fff'; g.fill(); }
+  g.restore();
+  if (h.n > 1 && !cl) label(h.x, h.y, '×' + h.n, '#fff', 15 + Math.min(h.n, 28), 1);
+}
+function label(x, y, s, c, z, a) {
+  g.globalAlpha = a; g.font = `800 ${z}px system-ui,-apple-system,"Segoe UI",sans-serif`; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.lineWidth = 3; g.strokeStyle = 'rgba(0,0,0,.65)'; g.strokeText(s, x, y); g.fillStyle = c; g.fillText(s, x, y); g.globalAlpha = 1;
+}
+function drawWyrm() {
+  const T = sim.trail, n = T.length, hue = FORMS[sim.form].hue, rush = sim.rush > 0, NB = 20;
+  g.save(); g.lineCap = g.lineJoin = 'round'; g.globalCompositeOperation = 'lighter';
+  if (sim.inv > 0 && Math.floor(sim.inv * 14) % 2) g.globalAlpha = .3; // blinking: just been hit
+  for (let pass = 0; pass < 2; pass++) for (let b = 0; b < NB; b++) { // the tail, in 20 pieces from dim tip to bright neck
+    const i0 = Math.floor(b * n / NB), i1 = Math.min(n - 1, Math.floor((b + 1) * n / NB)), u = (b + 1) / NB, end = b === NB - 1;
+    if (i1 <= i0 && !end) continue;
+    g.strokeStyle = rush ? `hsla(${200 + u * 40},100%,${pass ? 70 + u * 25 : 60}%,${pass ? 1 : .2})` : `hsla(${hue - (1 - u) * 45},100%,${pass ? 48 + u * 40 : 55}%,${pass ? 1 : .17})`;
+    g.lineWidth = (pass ? 1.2 + u * 5 : 5 + u * 13) * (rush ? 1.35 : 1);
+    g.beginPath(); g.moveTo(T[i0].x, T[i0].y); for (let i = i0 + 1; i <= i1; i++) g.lineTo(T[i].x, T[i].y); if (end) g.lineTo(sim.x, sim.y); g.stroke();
+  }
+  glow(sim.x, sim.y, rush ? 34 : 24, rush ? '#9fd8ff' : `hsl(${hue},100%,65%)`, .9);
+  g.globalCompositeOperation = 'source-over'; g.translate(sim.x, sim.y); g.rotate(headAng);
+  g.fillStyle = '#fff'; g.beginPath(); g.moveTo(11, 0); g.quadraticCurveTo(3, 8, -6, 5.5); g.quadraticCurveTo(-3, 0, -6, -5.5); g.quadraticCurveTo(3, -8, 11, 0); g.fill();
+  g.fillStyle = '#160b26'; g.beginPath(); g.arc(3.5, 2.7, 1.3, 0, TAU); g.arc(3.5, -2.7, 1.3, 0, TAU); g.fill();
+  g.restore();
+}
+function draw() {
+  g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1; g.globalCompositeOperation = 'source-over'; g.fillStyle = '#06050d'; g.fillRect(0, 0, cv.width, cv.height);
+  const ph = sim.dawn && sim.t < 450 ? 99 : sim.t / 60 | 0; if (ph !== bgPh) paintBg(bgPh = ph);
+  g.setTransform(dpr * sc, 0, 0, dpr * sc, dpr * (ox + (Math.random() - .5) * shake * sc), dpr * (oy + (Math.random() - .5) * shake * sc));
+  g.save(); g.beginPath(); g.rect(0, 0, W, sim.H); g.clip();
+  g.drawImage(bg, 0, 0, W, sim.H);
+  g.fillStyle = '#fff'; for (let i = 0; i < 26; i++) { g.globalAlpha = .5 + .5 * Math.sin(clock * (1 + i % 5 * .4) + i * 9); g.fillRect((i * 97.3) % W, (i * 211.7) % sim.H, 1.5, 1.5); } // twinkles
+  g.globalAlpha = 1;
+  for (const h of sim.holes) drawHole(h);
+  g.lineJoin = 'round';
+  for (const z of fizz) { g.globalAlpha = 1 - z.t / .5; g.strokeStyle = COL.anchor; g.lineWidth = 2; g.setLineDash([5, 6]); g.beginPath(); for (const p of z.poly) g.lineTo(p.x, p.y); g.closePath(); g.stroke(); g.setLineDash([]); }
+  g.globalCompositeOperation = 'lighter';
+  for (const r of rings) { const u = r.t / r.life; g.globalAlpha = 1 - u; g.strokeStyle = r.c; g.lineWidth = 3 * (1 - u) + 1; g.beginPath(); g.arc(r.x, r.y, r.R * (1 - (1 - u) ** 3), 0, TAU); g.stroke(); }
+  g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
+  if (!sim.over) drawWyrm();
+  for (const f of sim.foes) drawFoe(f);
+  for (const q of ghosts) drawFoe(q.f, q.t < 0 ? 1 : Math.max(0, 1 - q.t / .28));
+  g.globalCompositeOperation = 'lighter';
+  for (const b of bolts) { // jagged lightning
+    g.globalAlpha = 1 - b.t / .2; g.strokeStyle = '#cfe9ff'; g.lineWidth = 2; g.beginPath(); g.moveTo(b.x1, b.y1);
+    for (let i = 1; i < 6; i++) g.lineTo(b.x1 + (b.x2 - b.x1) * i / 6 + (Math.random() - .5) * 16, b.y1 + (b.y2 - b.y1) * i / 6 + (Math.random() - .5) * 16);
+    g.lineTo(b.x2, b.y2); g.stroke();
+  }
+  for (const p of P) { const u = 1 - p.t / p.life, z = p.s * (.4 + u); g.globalAlpha = u; g.fillStyle = p.c; g.fillRect(p.x - z / 2, p.y - z / 2, z, z); }
+  g.globalCompositeOperation = 'source-over';
+  for (const t of texts) { const u = t.t / t.life; label(t.x, t.y - u * 34, t.s, t.c, t.z * (1 + .5 * Math.max(0, 1 - t.t * 7)), Math.min(1, (1 - u) * 3)); }
+  if (flash > 0) { g.globalAlpha = Math.min(.5, flash); g.fillStyle = '#fff'; g.fillRect(0, 0, W, sim.H); }
+  if (red > 0) { g.globalAlpha = red * .45; g.fillStyle = '#ff1848'; g.fillRect(0, 0, W, sim.H); }
+  g.restore();
+}
+
+// ---------- what happened this step -> sparks and sound ----------
+const stagger = k => k <= 16 ? .045 * k : .72 + (k - 16) * .02; // the k-th swallow pops a little later: a rising run of notes
+function fx(e, loud) {
+  switch (e.e) {
+    case 'hole': { const n = e.h.n; flash = Math.max(flash, .08 + n * .015); shake = Math.max(shake, Math.min(15, 2 + n)); if (n >= 4) freeze = Math.min(.11, .03 + n * .005); if (loud) { snd('loop', n); if (n >= 5) buzz(18 + n); } break; }
+    case 'eat': {
+      const f = e.f, c = COL[f.type]; f.warm = 0; f.hot = false;
+      if (e.h) { ghosts.push({ f, h: e.h, t: -stagger(e.k), x0: f.x, y0: f.y }); if (loud) snd('pop', e.k, stagger(e.k) + .2); }
+      else { burst(f.x, f.y, c, 10); if (loud) snd('pop', 0); }
+      break;
+    }
+    case 'close': {
+      const h = e.h; if (!h.n) break;
+      say(h.x, h.y, '+' + num(h.pts), '#ffcf5a', 13 + Math.min(15, h.n));
+      const call = CALL.find(c => h.n >= c[0]); if (call) { say(h.x, h.y + 26, call[1], '#fff', 12 + Math.min(12, h.n / 2), 1.5); shake = Math.max(shake, 8); }
+      break;
+    }
+    case 'anchored': fizz.push({ poly: e.poly, t: 0 }); say(e.x, e.y, 'ANCHORED', COL.anchor, 15); if (loud) snd('anchored'); break;
+    case 'cut': for (let i = 0; i < e.pts.length; i += 2) burst(e.pts[i].x, e.pts[i].y, '#58e6ff', 1, 40, .6); if (loud) { snd('cut'); buzz(25); } break;
+    case 'crack': burst(e.x, e.y, '#fff', 8, 90, .35); if (loud) snd('crack'); break;
+    case 'bolt': bolts.push({ x1: e.x1, y1: e.y1, x2: e.x2, y2: e.y2, t: 0 }); if (loud) snd('bolt'); break;
+    case 'nova': rings.push({ x: e.x, y: e.y, R: e.R, t: 0, life: .5, c: '#ffd9a0' }); burst(e.x, e.y, '#ffd9a0', 30, 260, .6, 3); shake = Math.max(shake, 12); if (loud) { snd('nova'); buzz(40); } break;
+    case 'brood': rings.push({ x: e.x, y: e.y, R: 55, t: 0, life: .4, c: COL.seeker }); break;
+    case 'hurt': red = 1; shake = 18; freeze = .09; rings.push({ x: e.x, y: e.y, R: 160, t: 0, life: .45, c: '#ff6a8e' }); burst(e.x, e.y, '#ff6a8e', 26, 240, .6, 3); if (loud) { snd('hurt'); buzz(140); } break;
+    case 'heal': say(sim.x, sim.y - 22, '+♥', '#ff6a8e', 22); if (loud) snd('heal'); break;
+    case 'rush': if (loud) snd('rush'); break;
+    case 'aim': case 'dash': case 'spit': if (loud) snd(e.e); break;
+    case 'event': if (loud && e.kind === 'swarm') say(e.x, e.y, '!', COL.seeker, 30, 1.4); break;
+    case 'first': if (loud && MEET[e.type]) banner(...MEET[e.type]); break;
+    case 'boss': if (loud) { banner('AN ECLIPSE RISES', 'Circle it until it breaks.'); snd('boss'); } break;
+    case 'slain': flash = .6; shake = 20; freeze = .15; burst(e.x, e.y, COL.eclipse, 70, 320, 1, 3.5); rings.push({ x: e.x, y: e.y, R: 230, t: 0, life: .7, c: COL.eclipse }); if (loud) { banner('ECLIPSE SWALLOWED', 'The sky breathes.'); snd('slain'); buzz(200); } break;
+    case 'dawn': flash = .5; if (loud) { banner('DAWN', 'Hearts restored. Beyond here, nothing heals.'); snd('dawn'); } break;
+    case 'level': if (loud) { state = 'cards'; cardsAt = clock + .5; } break;
+    case 'over': {
+      const T = sim.trail, c = `hsl(${FORMS[sim.form].hue},100%,65%)`; for (let i = 0; i < T.length; i += 2) burst(T[i].x, T[i].y, c, 2, 90, 1.3, 3);
+      burst(sim.x, sim.y, '#fff', 40, 260, 1.2, 3); overAt = clock + (loud ? 1.6 : 1.2); if (loud) { state = 'dying'; snd('over'); }
+      break;
+    }
+  }
+}
+function effects(dt) {
+  const drag = Math.exp(-2.5 * dt);
+  for (const p of P) { p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= drag; p.vy *= drag; }
+  for (const q of ghosts) { // the swallowed spiral into their hole
+    q.t += dt; if (q.t < 0) continue;
+    const u = Math.min(1, q.t / .28), e = u * u; q.f.x = q.x0 + (q.h.x - q.x0) * e; q.f.y = q.y0 + (q.h.y - q.y0) * e;
+    if (u >= 1) burst(q.h.x, q.h.y, COL[q.f.type], q.f.type === 'eclipse' ? 0 : 5, 150, .45);
+  }
+  for (const a of [texts, rings, bolts, fizz]) for (const o of a) o.t += dt;
+  const keep = (a, f) => { let j = 0; for (const o of a) if (f(o)) a[j++] = o; a.length = j; };
+  keep(P, p => p.t < p.life); keep(ghosts, q => q.t < .28); keep(texts, t => t.t < t.life); keep(rings, r => r.t < r.life); keep(bolts, b => b.t < .2); keep(fizz, z => z.t < .5);
+  if (sim.rush > 0 && !sim.over) burst(sim.x, sim.y, '#9fd8ff', 1, 60, .4);
+  for (const f of sim.foes) if (f.hot && Math.random() < .25) burst(f.x, f.y, '#ffb24a', 1, 50, .35);
+  shake *= Math.exp(-9 * dt); flash -= dt * 2.2; red -= dt * 2.4;
+  let da = sim.ang - headAng; da = Math.atan2(Math.sin(da), Math.cos(da)); headAng += da * Math.min(1, dt * 18);
+}
+
+// ---------- screens ----------
+function show(id) { for (const s of ['title', 'cards', 'over']) $(s).classList.toggle('on', s === id); $('cards').classList.remove('ready'); app.classList.toggle('ingame', state !== 'title' && state !== 'over'); }
+function reset(seed, f) { sim = createSim(seed, worldH(), f); fit(); for (const a of [P, ghosts, texts, rings, bolts, fizz]) a.length = 0; shown = shake = flash = red = freeze = 0; headAng = sim.ang; }
+function attract() { state = 'title'; const un = save.un.filter(f => FORMS[f]); reset(Math.random() * 2 ** 31 | 0, un[Math.random() * un.length | 0] || 'ember'); }
+function start() { state = 'play'; reset(Math.random() * 2 ** 31 | 0, form); held = false; touch = null; hintStep = save.runs < 3 ? 0 : 9; show(null); }
+function menu() { attract(); paintForms(); $('best').textContent = save.best ? `Best ${num(save.best)} · longest night ${fmt(save.time)}` : ''; show('title'); }
+function paintForms() {
+  $('forms').innerHTML = Object.keys(FORMS).map(id => `<button class="form${id === form ? ' sel' : ''}${save.un.includes(id) ? '' : ' locked'}" style="--h:${FORMS[id].hue}" data-f="${id}" aria-label="${FORMS[id].name}"></button>`).join('');
+  $('blurb').innerHTML = `<b>${FORMS[form].name}</b><br>${FORMS[form].blurb}`;
+}
+$('forms').onclick = e => {
+  const id = e.target.dataset.f; if (!id) return;
+  if (save.un.includes(id)) { form = save.form = id; store(); paintForms(); } else $('blurb').innerHTML = `<b>🔒 ${FORMS[id].name}</b><br>${FORMS[id].lock} to wake it`;
+};
+function showCards() {
+  $('choices').innerHTML = sim.choices.map((id, i) => { const b = BOONS[id], l = (sim.boons[id] || 0) + 1; return `<button class="card" data-i="${i}"><em>${b.icon}</em><b>${b.name}<small>${'●'.repeat(l)}${'○'.repeat(b.max - l)}</small></b><span>${b.d(l)}</span></button>`; }).join('');
+  show('cards'); snd('level'); setTimeout(() => $('cards').classList.add('ready'), 400); // the thumb is still down: no instant mis-taps
+}
+$('choices').onclick = e => {
+  const c = e.target.closest('.card'); if (!c || state !== 'cards' || !sim.choices) return;
+  pick(sim, +c.dataset.i); snd('pick'); state = 'play'; show(null);
+};
+function finish() {
+  state = 'over'; save.runs++;
+  const news = [], un = (id, ok) => { if (ok && !save.un.includes(id)) { save.un.push(id); news.push(FORMS[id].name); } };
+  un('longfang', sim.best >= 15); un('storm', sim.slain > 0); un('glass', sim.t >= 180);
+  const rec = sim.score > save.best; if (rec) save.best = sim.score; save.time = Math.max(save.time, sim.t); store();
+  $('oTag').textContent = sim.dawn ? 'You saw the dawn' : 'The night takes you';
+  $('oScore').textContent = num(sim.score); $('oNew').style.display = rec && save.runs > 1 ? 'block' : 'none';
+  $('oStats').innerHTML = [['Night held', fmt(sim.t)], ['Biggest catch', '×' + sim.best], ['Swallowed', sim.eaten], ['Best', num(save.best)]].map(r => `<span>${r[0]}</span><b>${r[1]}</b>`).join('');
+  $('oBoons').innerHTML = Object.keys(sim.boons).map(id => BOONS[id].icon + (sim.boons[id] > 1 ? `<sup>${sim.boons[id]}</sup>` : '')).join(' ');
+  $('oUnlock').textContent = news.length ? '✨ New wyrm awake: ' + news.join(', ') : '';
+  show('over');
+}
+$('fly').onclick = $('again').onclick = () => { audio(); start(); };
+$('menu').onclick = menu;
+$('mute').onclick = () => { save.mute = !save.mute; store(); if (aOut) aOut.gain.value = save.mute ? 0 : .9; $('mute').classList.toggle('off', save.mute); };
+$('mute').classList.toggle('off', save.mute);
+
+// ---------- input: drag anywhere (relative, so the thumb never has to cover the wyrm) ----------
+cv.addEventListener('pointerdown', e => {
+  if (e.pointerType === 'mouse') return;
+  mouse = null; if (touch !== null) return;
+  touch = e.pointerId; held = true; lx = e.clientX; ly = e.clientY; try { cv.setPointerCapture(touch); } catch (err) { /* older browsers */ }
+});
+cv.addEventListener('pointermove', e => {
+  if (e.pointerType === 'mouse') { const r = cv.getBoundingClientRect(); mouse = { x: (e.clientX - r.left - ox) / sc, y: (e.clientY - r.top - oy) / sc }; return; }
+  if (e.pointerId !== touch) return;
+  if (state === 'play') steer(sim, (e.clientX - lx) / sc * 1.35, (e.clientY - ly) / sc * 1.35);
+  lx = e.clientX; ly = e.clientY;
+});
+const lift = e => { if (e.pointerId === touch) { touch = null; held = false; } };
+cv.addEventListener('pointerup', lift); cv.addEventListener('pointercancel', lift);
+addEventListener('pointerup', audio); addEventListener('contextmenu', e => e.preventDefault());
+addEventListener('resize', resize);
+document.addEventListener('visibilitychange', () => { if (AC) document.hidden ? AC.suspend() : AC.resume(); last = 0; });
+
+// ---------- main loop ----------
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = last ? Math.min(.05, (now - last) / 1000) : 0; last = now; clock += dt;
+  const resting = state === 'play' && !mouse && !held; // thumb lifted: time slows so you can breathe and re-grip
+  ts += ((resting ? .12 : 1) - ts) * Math.min(1, dt * 12);
+  if (freeze > 0) freeze -= dt;
+  else for (let left = dt * ts; left > 1e-5 && (state === 'play' || state === 'title') && !sim.choices && !sim.over;) {
+    const h = Math.min(left, 1 / 60); left -= h;
+    if (state === 'title') bot(sim); else if (mouse) aim(sim, mouse.x, mouse.y);
+    stepSim(sim, h);
+    const loud = state === 'play'; for (const e of sim.ev) fx(e, loud);
+  }
+  if (state === 'title') { if (sim.choices) pick(sim, Math.random() * sim.choices.length | 0); if (sim.over && clock > overAt) attract(); }
+  if (state === 'cards' && cardsAt && clock > cardsAt) { cardsAt = 0; showCards(); }
+  if (state === 'dying' && clock > overAt) finish();
+  if (state === 'play') {
+    if (hintStep === 0 && sim.moved > 250) hintStep = 1;
+    else if (hintStep === 1 && sim.eaten > 0) { hintStep = 2; hintT = clock + 5; }
+    else if (hintStep === 2 && clock > hintT) hintStep = 9;
+    inten = clamp(1 + (sim.foes.length / 22 | 0) + (sim.t / 140 | 0), 1, 4);
+  } else if (state === 'title' || state === 'over') inten = 0;
+  effects(dt); draw();
+  // HUD: only touch the DOM when a value changed
+  shown += (sim.score - shown) * Math.min(1, dt * 10);
+  set('hearts', '♥'.repeat(Math.max(0, sim.hearts)) + '<s>♥</s>'.repeat(Math.max(0, sim.maxHearts - sim.hearts)), 1);
+  set('score', num(shown)); set('time', fmt(sim.t)); set('lvl', sim.level ? 'BOON ' + sim.level : '');
+  set('hint', state === 'play' && HINTS[hintStep] || '');
+  const w = Math.round(100 * sim.xp / need(sim.level)) + '%'; if (set.xp !== w) $('xp').firstChild.style.width = set.xp = w;
+  $('hold').classList.toggle('on', resting); app.classList.toggle('low', state === 'play' && sim.hearts === 1 && sim.maxHearts > 1);
+}
+function set(id, v, html) { if (set[id] !== v) { set[id] = v; $(id)[html ? 'innerHTML' : 'textContent'] = v; } }
+
+resize(); menu(); requestAnimationFrame(frame);
+</script>
+</body>
+</html>

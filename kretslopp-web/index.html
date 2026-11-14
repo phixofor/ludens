@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#0e0c0a">
+<title>Kretslopp</title>
+<style>
+:root{--panel:rgba(30,26,21,.86);--line:rgba(255,255,255,.09);--txt:#efe6d8;--dim:#a39889;--A:#ffc638;--B:#46e1ff;--C:#ff4880;--season:#7fd66b}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0;overflow:hidden;overscroll-behavior:none}
+body{background:radial-gradient(120% 90% at 50% 0%,#211b15,#0b0908 70%);color:var(--txt);font:14px/1.3 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;user-select:none;-webkit-user-select:none}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer;touch-action:manipulation}
+#app{height:100%;height:100dvh;display:flex;flex-direction:column;max-width:860px;margin:0 auto;gap:6px;padding:max(6px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(6px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left))}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:6px 10px;backdrop-filter:blur(6px)}
+#hud{display:grid;grid-template-columns:1fr 1.5fr;gap:6px}
+#seasonCard{grid-column:1/3;display:flex;align-items:center;gap:10px}
+#seasonIcon{font-size:24px;line-height:1}
+#seasonTxt{min-width:74px}
+#seasonTxt b{display:block;font-size:15px;letter-spacing:.02em}
+small{color:var(--dim);font-size:11px}
+#wheel{flex:1;position:relative;height:10px;border-radius:5px;background:linear-gradient(90deg,#6fcf62 0 25%,#f2c744 25% 50%,#e07a35 50% 75%,#9cc6ee 75%);opacity:.9}
+#wheel i{position:absolute;top:-4px;width:4px;height:18px;margin-left:-2px;border-radius:2px;background:#fff;box-shadow:0 0 8px #fff}
+#nextLbl{min-width:96px;text-align:right;font-size:12px;color:var(--txt);font-variant-numeric:tabular-nums}
+#healthCard{display:flex;flex-direction:column;justify-content:center;gap:3px}
+#healthCard div{display:flex;justify-content:space-between;align-items:baseline}
+#healthVal{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.meter{height:5px;border-radius:3px;background:rgba(255,255,255,.1);overflow:hidden}
+.meter i{display:block;height:100%;width:0;border-radius:3px;background:linear-gradient(90deg,#ff5a4a,#ffd24a,#5fe28a);transition:width .25s}
+#popCard{display:flex;align-items:center;gap:8px}
+#goalCard{grid-column:1/3;display:flex;justify-content:space-between;gap:8px;font-size:12.5px;background:linear-gradient(90deg,rgba(127,214,107,.24) var(--p,0%),var(--panel) var(--p,0%))}
+#goalTxt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#stars{display:inline-block;white-space:nowrap;letter-spacing:1px}
+#stars.pop{animation:pop .6s}
+@keyframes pop{40%{transform:scale(1.7)}}
+#medals{display:flex;flex-wrap:wrap;gap:4px 8px;margin-top:10px;font-size:24px}
+#medals span{opacity:.25;filter:grayscale(1);cursor:pointer}
+#medals span.got{opacity:1;filter:none}
+#medals span.new{text-shadow:0 0 12px var(--A)}
+#pb{font-size:10.5px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#pb.new{color:var(--A)}
+body.danger #view{animation:danger 1s infinite}
+@keyframes danger{50%{box-shadow:0 0 0 2px #ff3b30,0 0 54px 0 #ff3b30}}
+#unlock{margin-top:10px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.05);font-size:13.5px}
+#unlock .meter{margin-top:6px}
+#pops{display:flex;flex-direction:column;gap:1px;font-size:12px;font-variant-numeric:tabular-nums;min-width:92px}
+#pops span::before{content:"";display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;background:var(--c);box-shadow:0 0 6px var(--c)}
+#spark{flex:1;min-width:0;height:44px;width:100%}
+#stage{flex:1;min-height:0;position:relative;display:grid;place-items:center}
+#view{position:relative;overflow:hidden;border-radius:10px;touch-action:none;box-shadow:0 0 0 1px var(--line),0 0 46px -10px var(--season),0 14px 40px rgba(0,0,0,.6);transition:box-shadow 2s;cursor:crosshair}
+#world{display:block;image-rendering:pixelated;image-rendering:crisp-edges;image-rendering:pixelated;transform-origin:0 0;touch-action:none}
+#view::after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle,transparent 62%,rgba(0,0,0,.34))}
+#say{position:absolute;left:50%;top:8px;transform:translateX(-50%);max-width:92%;padding:6px 12px;border-radius:16px;background:rgba(12,10,8,.82);border:1px solid var(--line);font-size:13px;text-align:center;pointer-events:none;opacity:0;transition:opacity .4s}
+#say.on{opacity:1}
+#banner{position:absolute;left:50%;top:64px;transform:translateX(-50%) scale(.9);width:max-content;max-width:92%;padding:5px 12px;border-radius:12px;background:linear-gradient(180deg,#3a2a12,#201608);border:1px solid #f2c744;color:#ffe9b0;font-size:12px;font-weight:600;text-align:center;pointer-events:none;opacity:0;transition:.35s}
+#banner.on{opacity:1;transform:translateX(-50%) scale(1)}
+#zoomBtns{position:absolute;right:6px;bottom:6px;display:flex;flex-direction:column;gap:6px}
+#zoomBtns button{width:44px;height:44px;border-radius:12px;background:rgba(12,10,8,.78);border:1px solid var(--line);font-size:22px}
+#bar{display:flex;flex-direction:column;gap:6px}
+#meters{display:grid;grid-template-columns:1fr 1fr;gap:10px;font-size:12px;padding:0 2px}
+#meters div.lbl{display:flex;justify-content:space-between;margin-bottom:2px;color:var(--dim)}
+#meters b{color:var(--txt);font-variant-numeric:tabular-nums}
+#resNBar{background:linear-gradient(90deg,#3f9b46,#9be36a)}
+#resWBar{background:linear-gradient(90deg,#70406f,#c77fc4)}
+#tools{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+#tools button,#ctrl button{min-height:52px;border-radius:12px;background:var(--panel);border:1px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:11px;transition:.12s}
+#tools button span{font-size:21px;line-height:1.1}
+#tools button.on{border-color:var(--season);background:rgba(255,255,255,.1);box-shadow:0 0 14px -4px var(--season),inset 0 0 0 1px var(--season);transform:translateY(-2px)}
+#ctrl{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
+#ctrl button{min-height:46px;font-size:15px;font-weight:600}
+#ctrl button.on{border-color:var(--season);background:rgba(255,255,255,.12)}
+#ctrl button:active,#tools button:active,#zoomBtns button:active{transform:scale(.94)}
+.modal{position:fixed;inset:0;z-index:9;display:none;place-items:center;padding:14px;background:rgba(6,5,4,.72);backdrop-filter:blur(5px)}
+.modal.open{display:grid}
+.sheet{width:min(560px,100%);max-height:88vh;max-height:88dvh;overflow:auto;background:#1c1813;border:1px solid var(--line);border-radius:18px;padding:18px 18px 16px;box-shadow:0 30px 80px rgba(0,0,0,.7);user-select:text;-webkit-user-select:text}
+.sheet h1{margin:0 0 2px;font-size:26px;letter-spacing:.04em;background:linear-gradient(90deg,var(--A),#9be36a,var(--B));-webkit-background-clip:text;background-clip:text;color:transparent}
+.sheet h2{margin:0 0 8px;font-size:19px}
+.sheet p{margin:8px 0;font-size:15px}
+.sheet ol{margin:8px 0;padding-left:22px}
+.sheet li{margin:5px 0;font-size:13.5px}
+.sheet .go{display:block;width:100%;margin-top:14px;min-height:50px;border-radius:14px;font-weight:700;font-size:16px;color:#17130e;background:linear-gradient(90deg,var(--A),#9be36a)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:12px;color:var(--dim);margin:8px 0}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+#graph{width:100%;height:220px;display:block;border-radius:10px;background:#120f0c;margin:10px 0 4px}
+#obit{font-size:15px}
+#end .go{position:sticky;bottom:-6px;box-shadow:0 -10px 16px 4px #1c1813}
+#end #graph{height:150px}
+.how{display:grid;grid-template-columns:auto 1fr;gap:8px 10px;align-items:center;margin:12px 0;font-size:14.5px}
+.how span{font-size:22px;text-align:center}
+.sw{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px}
+#boonList button{display:flex;gap:12px;align-items:center;width:100%;text-align:left;padding:12px;margin-top:8px;border-radius:14px;background:rgba(255,255,255,.06);border:1px solid var(--line);font-size:13px;color:var(--dim)}
+#boonList button span{font-size:28px}
+#boonList button b{display:block;font-size:15.5px;color:var(--txt)}
+#boonList button:active{transform:scale(.97)}
+#endStats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px;text-align:center}
+#endStats div{background:rgba(255,255,255,.05);border-radius:10px;padding:8px 4px}
+#endStats b{display:block;font-size:19px}
+#board{margin:4px 0 0;padding-left:24px}
+#board li{margin:3px 0;font-size:13.5px;font-variant-numeric:tabular-nums}
+#board li.me{color:var(--A);font-weight:600}
+@media (orientation:landscape) and (max-height:600px){
+  #app{display:grid;grid-template-columns:minmax(270px,330px) 1fr;grid-template-rows:auto 1fr;max-width:none}
+  #hud{grid-column:1;grid-row:1}#bar{grid-column:1;grid-row:2;overflow:auto}#stage{grid-column:2;grid-row:1/3}
+  #tools button{min-height:44px}#ctrl button{min-height:40px}#spark{height:30px}
+}
+</style>
+</head>
+<body data-s="0">
+<div id="app">
+  <header id="hud">
+    <div class="card" id="seasonCard">
+      <span id="seasonIcon">🌱</span>
+      <div id="seasonTxt"><b id="seasonName">Spring</b><small id="yearLbl">Year 1</small></div>
+      <div id="wheel"><i id="wheelPos"></i></div>
+      <span id="nextLbl"></span>
+    </div>
+    <div class="card" id="healthCard">
+      <div><small>HEALTH</small><b id="healthVal">0</b></div>
+      <div class="meter"><i id="healthBar"></i></div>
+      <span id="pb"></span>
+    </div>
+    <div class="card" id="popCard">
+      <div id="pops"><span style="--c:var(--A)" id="popA"></span><span style="--c:var(--B)" id="popB"></span><span style="--c:var(--C)" id="popC"></span></div>
+      <canvas id="spark"></canvas>
+    </div>
+    <div class="card" id="goalCard"><span id="goalTxt"></span><span id="stars"></span></div>
+  </header>
+  <main id="stage">
+    <div id="view"><canvas id="world"></canvas></div>
+    <div id="say"></div><div id="banner"></div>
+    <div id="zoomBtns"><button id="zin" aria-label="Zoom in">+</button><button id="zout" aria-label="Zoom out">−</button></div>
+  </main>
+  <footer id="bar">
+    <div id="meters">
+      <div><div class="lbl"><span>🌿 Nutrient</span><b id="resNVal"></b></div><div class="meter"><i id="resNBar"></i></div></div>
+      <div><div class="lbl"><span>💩 Waste</span><b id="resWVal"></b></div><div class="meter"><i id="resWBar"></i></div></div>
+    </div>
+    <div id="tools">
+      <button data-t="scoop"><span>🧺</span>Scoop</button>
+      <button data-t="feed"><span>🌿</span>Feed</button>
+      <button data-t="muck"><span>💩</span>Muck</button>
+      <button data-t="stone"><span>🪨</span>Stone</button>
+      <button data-t="water"><span>💧</span>Water</button>
+      <button data-t="soil"><span>🟫</span>Soil</button>
+      <button data-t="pan"><span>✋</span>Pan</button>
+    </div>
+    <div id="ctrl">
+      <button id="pause" aria-label="Pause">⏸</button>
+      <button id="speed" aria-label="Speed">1×</button>
+      <button id="heat" aria-label="Health map">🌡</button>
+      <button id="mute" aria-label="Sound">🔊</button>
+      <button id="rulesBtn" aria-label="Rules">📜</button>
+    </div>
+  </footer>
+</div>
+
+<div class="modal" id="intro"><div class="sheet">
+  <h1>KRETSLOPP</h1><small>a small ecosystem with big opinions</small>
+  <div class="how">
+    <span>🟡</span><div><b style="color:var(--A)">Gobblers</b> eat <i class="sw" style="background:#2f7a35"></i> green nutrient and leave <i class="sw" style="background:#70406f"></i> purple waste.</div>
+    <span>🔵</span><div><b style="color:var(--B)">Mulchers</b> eat the purple waste and leave green nutrient.</div>
+    <span>🧺</span><div>You can't steer them – you move their food. <b>Scoop</b> it up where there is plenty (a little spills).</div>
+    <span>🌿</span><div><b>Feed</b> green right onto Gobblers, <b>Muck</b> 💩 purple onto Mulchers: they eat from your hand, and babies sprout beside them.</div>
+    <span>❄️</span><div>Nothing grows in winter, and every winter is harsher. Stock up before it comes.</div>
+    <span>🏆</span><div>Keep both species alive for as many years as you can.</div>
+  </div>
+  <button class="go" data-close>Got it. Release them.</button>
+</div></div>
+
+<div class="modal" id="boon"><div class="sheet">
+  <h2 id="boonTitle"></h2><small>Pick one gift – it lasts the whole run.</small>
+  <div id="boonList"></div>
+</div></div>
+
+<div class="modal" id="rules"><div class="sheet">
+  <h2>📜 Rules <small>– one sentence each, we promise</small></h2>
+  <div class="legend">
+    <span><i style="background:var(--A)"></i>Gobblers</span><span><i style="background:var(--B)"></i>Mulchers</span><span><i style="background:var(--C)"></i>Nippers</span>
+    <span><i style="background:#2f7a35"></i>nutrient</span><span><i style="background:#70406f"></i>waste</span><span><i style="background:#8a8d94"></i>stone</span><span><i style="background:#2a66b8"></i>water</span>
+  </div>
+  <ol>
+    <li>Gobblers eat nutrient and leave waste; Mulchers eat waste and leave nutrient.</li>
+    <li>A little of every meal is burned up, so the cycle runs down unless the soil keeps up.</li>
+    <li>Soil regrows nutrient in spring and summer, barely in autumn and not at all in winter.</li>
+    <li>A creature with fewer than 2 neighbours of its own species dies of loneliness.</li>
+    <li>Every neighbour beyond 3 costs extra energy, so crowds only last where food is plentiful.</li>
+    <li>A creature whose energy hits zero dies – dim ones are hungry, red-blinking ones are starving.</li>
+    <li>Birth: an empty soil cell with exactly 3 neighbours of one species and food in the cell gets a new creature.</li>
+    <li>A well-fed creature sometimes shoots a seed that lands as a small group on food-rich soil nearby.</li>
+    <li>Too much waste in a cell poisons Gobblers and Nippers.</li>
+    <li>Winter raises everyone's upkeep, and every winter is harsher than the last.</li>
+    <li>Nutrient and waste spread to neighbouring cells: slowly through soil, fast through water, never through stone.</li>
+    <li>Scoop moves half of a cell's nutrient and waste into your two reservoirs.</li>
+    <li>Feed pours nutrient back out (Gobbler food); Muck pours waste back out (Mulcher food, Gobbler poison).</li>
+    <li>Poured straight onto the right creature, it is eaten at once; poured on empty soil next to two of them, a newborn sprouts at once.</li>
+    <li>Stone and water squash whoever lives there, and nobody can live on them; Soil erases them for free.</li>
+    <li>Your tools never run out, but a fifth of everything you scoop is spilled and gone – so move food when it matters, not for fun.</li>
+    <li>After a couple of years the Nippers raid every summer with a bigger pack, unless the Gobblers are too few to bother: a hungry Nipper eats an adjacent Gobbler.</li>
+    <li>Drought: water behaves like soil for a while.</li>
+    <li>Flood: water spreads out and washes away nearby nutrient and waste.</li>
+    <li>Health is average energy × average age: a mood ring, not a score.</li>
+    <li>Every new year you pick one gift.</li>
+    <li>Each season brings a small goal; every goal is a star, and three stars are a bonus gift.</li>
+    <li>Every year you survive, in any run, counts toward unlocking new worlds.</li>
+    <li>Medals are kept forever; the end screen shows which ones you are missing.</li>
+    <li>If the Gobblers or the Mulchers die out, the run is over – your score is how long they lasted.</li>
+  </ol>
+  <small>Keys: 1–7 tools · space pause · H health map · M sound · +/− zoom · two fingers pan and zoom</small>
+  <button class="go" data-close>Back to the mud</button>
+</div></div>
+
+<div class="modal" id="end"><div class="sheet">
+  <h2 id="endTitle">The ecosystem collapsed</h2>
+  <p id="obit"></p>
+  <canvas id="graph"></canvas>
+  <div class="legend">
+    <span><i style="background:var(--A)"></i>Gobblers</span><span><i style="background:var(--B)"></i>Mulchers</span><span><i style="background:var(--C)"></i>Nippers</span>
+    <span><i style="background:#fff"></i>Health (dashed)</span><span>🏜 drought · 🌊 flood · 🦷 Nippers arrive</span>
+  </div>
+  <div id="endStats"></div>
+  <div id="unlock"></div>
+  <div id="medals"></div><small id="medalTxt"></small>
+  <p style="margin-bottom:0"><small>YOUR BEST RUNS – saved in this browser only</small></p>
+  <ol id="board"></ol>
+  <button class="go" id="restart">Try again. Nature is forgiving. (No.)</button>
+</div></div>
+
+<script>
+//<SIM>
+/* ====================================================================
+   CONFIG – every tuning value in one place.
+   Mass balance: a share of every meal is lost (EAT_LOSS), soil regrows
+   nutrient in the warm seasons (GROW). The player only moves mass around.
+   ==================================================================== */
+const CONFIG = {
+  GRID: 120,              // grid side (cells)
+  TICKS_PER_SEC: 12,      // simulation rate at 1× (a season = 12 s, a year = 50 s)
+  SEASON_TICKS: 150,      // ticks per season (4 seasons = 1 year)
+
+  // --- Resource flow ---
+  DIFF_SOIL: 0.06,        // diffusion per tick and neighbour in soil
+  DIFF_WATER: 0.22,       // diffusion in water (must stay < 0.25)
+  DECOMP: 0.0005,         // share of waste turning into nutrient per tick on soil
+  DECOMP_SEASON: [1, 2.5, 1, 0],   // spring, summer, autumn, winter
+
+  // --- Metabolism ---
+  EAT: 0.03,              // max food a creature eats per tick
+  EAT_GAIN: 1,            // energy per unit of food
+  EAT_LOSS: 0.15,         // share of every meal that is burned and leaves the cycle
+  GROW: 0.003,            // soil regrows nutrient towards its natural richness (share of the gap per tick)
+  GROW_SEASON: [1, 0.6, 0.2, 0],
+  UPKEEP: [0.007, 0.007, 0.008],   // upkeep per tick for A, B, C
+  UPKEEP_SEASON: [1, 1, 1.1, 2.2], // winter is expensive
+  WASTE_TOXIC: 0.6,       // waste level where A and C start to suffer
+  WASTE_DRAIN: 0.04,      // energy lost per tick above that level
+  CROWD_DRAIN: 0.008,     // extra upkeep per same-species neighbour beyond 3 (crowding = competition)
+  WINTER_GROWTH: 0.2,     // every winter is this much harsher than the last
+
+  // --- Birth ---
+  BIRTH_FOOD: 0.12,       // food a birth eats from its cell (3 neighbours) – no food, no babies
+  BIRTH_ENERGY: 0.5,      // energy of a newborn
+
+  // --- Seeds (what lets colonies spread) ---
+  SEED_ENERGY: [0.9, 0.9, 0.75], // how full an A, B, C must be to seed
+  SEED_CHANCE: [0.004, 0.004, 0.035], // chance per tick that a full A, B, C shoots a seed
+  SEED_RANGE: 6,          // how far a seed flies (cells)
+  SEED_FOOD: 0.15,        // food needed in the whole 3×3 landing area
+  SEED_SHAPES: [0.7, 0.2], // share of clovers, blinkers (the rest are gliders)
+  SEED_COST: 0.4,         // energy the parent pays
+  SEED_BORN: 0.4,         // energy of each creature in the new figure
+
+  // --- Nippers (C) ---
+  C_UNLOCK_YEAR: 3,
+  HUNT_HUNGER: 0.85,      // C only hunts below this energy
+  HUNT_CHANCE: 0.6,       // chance per tick that a hungry C actually bites
+  HUNT_GAIN: 0.55,        // energy per eaten Gobbler
+  HUNT_SHARE: 0.3,        // energy each Nipper neighbour gets from the meal
+  HUNT_WASTE: 0.04,       // waste per meal
+  HUNT_SEED_RANGE: 9,     // Nipper seeds fly further …
+  HUNT_SEED_TRIES: 8,     // … and get several tries to find a spot next to prey
+  C_SEEDS: 6,             // number of places the Nippers land
+  C_MIN_PREY: 150,        // no raid in a year when the Gobblers are fewer than this
+  C_SEED_CLOVERS: 4,      // clovers per place
+
+  // --- Events ---
+  EVENT_CHANCE: 0.7,      // chance per year (from year 2), max one per year
+  EVENT_WARN: 60,         // ticks of warning (5 s at 1×)
+  DROUGHT_TICKS: 120,
+  FLOOD_TICKS: 80,
+  FLOOD_RADIUS: 3,        // how far the water spreads
+  FLOOD_LOSS: 0.006,      // share of resources washed away per tick
+
+  // --- Player economy ---
+  SCOOP_LOSS: 0.2,        // share of every scoop that is spilled: moving food is the only cost of acting
+  RESERVOIR_MAX: 80, RESERVOIR_START: 30, // one reservoir for nutrient, one for waste
+  HARVEST_FRAC: 0.5,      // share of a cell's nutrient and waste that Scoop takes
+  FERT_AMOUNT: 0.2,       // nutrient (Feed) or waste (Muck) poured per cell
+  BRUSH: 2,               // brush radius (cells)
+
+  // --- Score ---
+  AGE_NORM: 40,           // age (ticks) that counts as "grown up"
+  HIST_EVERY: 10,         // ticks between samples in the graph
+
+  // --- Starting world ---
+  SOIL_POOR: 0.06,        // N+W in the outskirts
+  SOIL_RICH: 0.7,         // extra N+W in the middle of the meadow
+  MEADOW_RADIUS: 34,
+  START_RADIUS: 27,       // radius of the starting colony
+  STONES: 7,              // boulder fields
+  STREAMS: 1,             // streams with a pond at the end
+  START_DENSITY: 0.35,
+  START_ENERGY: 0.7,
+  START_WASTE_FRAC: 0.5,  // share of the starting resources that is waste
+};
+
+const G = CONFIG.GRID, CELLS = G * G;
+const SOIL = 0, STONE = 1, WATER = 2;
+const PAT_BLOCK = [0, 0, 1, 0, 0, 1, 1, 1], PAT_BLINKER = [0, 1, 1, 1, 2, 1], PAT_GLIDER = [1, 0, 2, 1, 0, 2, 1, 2, 2, 2];
+const DX8 = [-1, 0, 1, -1, 1, -1, 0, 1], DY8 = [-1, -1, -1, 0, 0, 1, 1, 1];
+
+function makeRng(seed) { // mulberry32
+  let s = seed >>> 0;
+  return () => { s = s + 0x6D2B79F5 | 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+}
+
+function createSim(seed, over) {
+  const C = Object.assign({}, CONFIG, over), rnd = makeRng(seed); // per-run copy: worlds and boons change it
+  const f32 = () => new Float32Array(CELLS), u8 = () => new Uint8Array(CELLS);
+  const sim = {
+    cfg: C, rnd, tick: 0, terrain: u8(), cap: f32(), N: f32(), W: f32(), N2: f32(), W2: f32(),
+    S: u8(), S2: u8(), E: f32(), E2: f32(), AGE: new Uint16Array(CELLS), AGE2: new Uint16Array(CELLS),
+    cnt: [u8(), u8(), u8()], eaten: u8(), flood: u8(), cond: f32(), ghost: u8(), ghostS: u8(),
+    pop: [0, 0, 0], health: 0, cActive: false, event: null, pending: null,
+    seeds: [], deaths: new Float32Array(18), // [species*6 + cause]: lonely, crowded, starved, poisoned, eaten, squashed
+    hA: [], hB: [], hC: [], hH: [], marks: [], out: [], over: null,
+  };
+  const noise = () => { // smooth noise from a coarse grid
+    const n = 9, g = []; for (let i = 0; i < n * n; i++) g.push(rnd());
+    return (x, y) => {
+      const fx = x / G * (n - 1), fy = y / G * (n - 1), x0 = fx | 0, y0 = fy | 0, x1 = Math.min(x0 + 1, n - 1), y1 = Math.min(y0 + 1, n - 1), tx = fx - x0, ty = fy - y0;
+      const a = g[y0 * n + x0] + (g[y0 * n + x1] - g[y0 * n + x0]) * tx, b = g[y1 * n + x0] + (g[y1 * n + x1] - g[y1 * n + x0]) * tx;
+      return a + (b - a) * ty;
+    };
+  };
+  const fert = noise(), kind = noise(), c = G / 2, T = sim.terrain;
+  for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) {
+    const d2 = (x - c) * (x - c) + (y - c) * (y - c), i = y * G + x;
+    const m = C.SOIL_POOR + C.SOIL_RICH * Math.exp(-d2 / (C.MEADOW_RADIUS * C.MEADOW_RADIUS)) * (0.7 + 0.6 * fert(x, y));
+    sim.cap[i] = m; sim.N[i] = m * (1 - C.START_WASTE_FRAC); sim.W[i] = m * C.START_WASTE_FRAC;
+  }
+  const blob = (bx, by, r, t) => {
+    for (let y = Math.max(0, by - r | 0); y <= Math.min(G - 1, by + r); y++) for (let x = Math.max(0, bx - r | 0); x <= Math.min(G - 1, bx + r); x++)
+      if ((x - bx) * (x - bx) + (y - by) * (y - by) < r * r * (0.55 + 0.6 * rnd())) T[y * G + x] = t;
+  };
+  for (let k = 0; k < C.STONES; k++) { const a = rnd() * 6.283, d = G * (0.31 + rnd() * 0.15); blob(c + Math.cos(a) * d | 0, c + Math.sin(a) * d | 0, 3 + rnd() * 4, STONE); }
+  // streams from the top edge down to a pond, at a respectful distance from the meadow
+  for (let k = 0, side = rnd() < 0.5 ? -1 : 1; k < C.STREAMS; k++, side = -side) {
+    let sx = c + side * G * (0.275 + rnd() * 0.1); const len = G * (0.45 + rnd() * 0.34) | 0, keep = G * (0.225 + 0.06 * (k >> 1));
+    for (let y = 0; y < len; y++) {
+      sx += (rnd() - 0.5) * 2.4; if ((sx - c) * side < keep) sx = c + side * keep; sx = Math.max(3, Math.min(G - 4, sx));
+      T[y * G + (sx | 0)] = WATER; T[y * G + (sx | 0) + 1] = WATER;
+    }
+    blob(sx | 0, len, 5, WATER);
+  }
+  // starting colony: patches of A and B
+  const R2 = C.START_RADIUS * C.START_RADIUS;
+  for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) {
+    const i = y * G + x;
+    if (T[i] === SOIL && (x - c) * (x - c) + (y - c) * (y - c) < R2 && rnd() < C.START_DENSITY) { sim.S[i] = kind(x * 2.5 % G, y * 2.5 % G) > 0.5 ? 1 : 2; sim.E[i] = C.START_ENERGY; }
+  }
+  return sim;
+}
+
+function seedHunters(sim, extra) {
+  const C = sim.cfg, rnd = sim.rnd, spots = [];
+  for (let k = 0; k < 400; k++) {
+    const x = 8 + rnd() * (G - 16) | 0, y = 8 + rnd() * (G - 16) | 0; let n = 0;
+    for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) if (sim.S[(y + dy) * G + x + dx] === 1) n++;
+    spots.push([n, x, y]);
+  }
+  spots.sort((a, b) => b[0] - a[0]);
+  const used = [];
+  for (const [, x, y] of spots) {
+    if (used.length >= C.C_SEEDS + extra) break;
+    if (used.some(u => Math.abs(u[0] - x) + Math.abs(u[1] - y) < 18)) continue;
+    used.push([x, y]);
+    for (let k = 0, placed = 0; k < 80 && placed < C.C_SEED_CLOVERS; k++) { // clovers next to the prey
+      const j = (y + (rnd() * 11 | 0) - 5) * G + x + (rnd() * 11 | 0) - 5; let ok = true, prey = 0;
+      for (let q = 0; q < 4; q++) { const c = j + (q & 1) + (q >> 1) * G; if (sim.terrain[c] !== SOIL || sim.S[c]) { ok = false; break; } prey += sim.cnt[0][c]; }
+      for (let dy = -1; ok && dy <= 2; dy++) for (let dx = -1; dx <= 2; dx++) if (sim.S[j + dy * G + dx] === 3) ok = false;
+      if (!ok || !prey) continue;
+      for (let q = 0; q < 4; q++) { const c = j + (q & 1) + (q >> 1) * G; sim.S[c] = 3; sim.E[c] = 0.7; sim.AGE[c] = 0; }
+      placed++;
+    }
+  }
+  sim.cActive = true; sim.marks.push({ t: sim.tick, type: 'hunters' }); sim.out.push({ k: 'hunters', again: extra > 0 });
+}
+
+function stepSim(sim) {
+  const C = sim.cfg, T = sim.terrain, N = sim.N, W = sim.W, N2 = sim.N2, W2 = sim.W2, S = sim.S, S2 = sim.S2, E = sim.E, E2 = sim.E2, A = sim.AGE, A2 = sim.AGE2;
+  const cond = sim.cond, flood = sim.flood, eaten = sim.eaten, gh = sim.ghost, ghS = sim.ghostS, deaths = sim.deaths, rnd = sim.rnd, cnt = sim.cnt;
+  const cA = cnt[0], cB = cnt[1], cC = cnt[2];
+  const t = sim.tick, ST = C.SEASON_TICKS, YT = ST * 4, season = Math.floor(t / ST) % 4;
+
+  // --- calendar: new years, Nippers, events ---
+  if (t % YT === 0) {
+    const year = t / YT + 1;
+    if (t) sim.out.push({ k: 'year', year });
+    if (year >= 2 && rnd() < C.EVENT_CHANCE) sim.pending = { type: rnd() < 0.5 ? 'drought' : 'flood', start: t + Math.floor(YT * (0.12 + 0.6 * rnd())) };
+  }
+  if (t % YT === ST) { const year = Math.floor(t / YT) + 1; if (year >= C.C_UNLOCK_YEAR && !sim.pop[2] && sim.pop[0] >= C.C_MIN_PREY) seedHunters(sim, year - C.C_UNLOCK_YEAR); } // Nippers raid in summer, when there is prey to spare
+  if (t > 0 && t % ST === 0) sim.out.push({ k: 'season', season });
+  if (sim.pending) {
+    const p = sim.pending;
+    if (t === p.start - C.EVENT_WARN) sim.out.push({ k: 'warn', type: p.type });
+    if (t === p.start) {
+      sim.event = { type: p.type, end: t + (p.type === 'flood' ? C.FLOOD_TICKS : C.DROUGHT_TICKS) };
+      sim.marks.push({ t, type: p.type }); sim.out.push({ k: 'event', type: p.type }); sim.pending = null;
+      if (p.type === 'flood') {
+        const r = C.FLOOD_RADIUS;
+        for (let y = 0; y < G; y++) for (let x = 0; x < G; x++) if (T[y * G + x] === WATER)
+          for (let yy = Math.max(0, y - r); yy <= Math.min(G - 1, y + r); yy++) for (let xx = Math.max(0, x - r); xx <= Math.min(G - 1, x + r); xx++) if (T[yy * G + xx] === SOIL) flood[yy * G + xx] = 1;
+      }
+    }
+  }
+  if (sim.event && t >= sim.event.end) { sim.out.push({ k: 'eventEnd', type: sim.event.type }); flood.fill(0); sim.event = null; }
+  const drought = !!sim.event && sim.event.type === 'drought', fl = !!sim.event && sim.event.type === 'flood';
+
+
+  // --- diffusion + decomposition (N,W -> N2,W2) ---
+  const DS = C.DIFF_SOIL, DW = C.DIFF_WATER, dec = C.DECOMP * C.DECOMP_SEASON[season], keep = 1 - C.FLOOD_LOSS, grow = C.GROW * C.GROW_SEASON[season], cap = sim.cap;
+  for (let i = 0; i < CELLS; i++) { const tt = T[i]; cond[i] = tt === STONE ? 0 : tt === WATER ? (drought ? DS : DW) : (flood[i] ? DW : DS); }
+  for (let y = 0, i = 0; y < G; y++) for (let x = 0; x < G; x++, i++) {
+    const c = cond[i]; let n = N[i], w = W[i];
+    if (c === 0) { N2[i] = n; W2[i] = w; continue; }
+    let dn = 0, dw = 0, k;
+    if (x > 0 && (k = cond[i - 1]) > 0) { k = (k + c) * 0.5; dn += k * (N[i - 1] - n); dw += k * (W[i - 1] - w); }
+    if (x < G - 1 && (k = cond[i + 1]) > 0) { k = (k + c) * 0.5; dn += k * (N[i + 1] - n); dw += k * (W[i + 1] - w); }
+    if (y > 0 && (k = cond[i - G]) > 0) { k = (k + c) * 0.5; dn += k * (N[i - G] - n); dw += k * (W[i - G] - w); }
+    if (y < G - 1 && (k = cond[i + G]) > 0) { k = (k + c) * 0.5; dn += k * (N[i + G] - n); dw += k * (W[i + G] - w); }
+    n += dn; w += dw;
+    if (fl && (flood[i] || T[i] === WATER)) { n *= keep; w *= keep; }
+    else if (T[i] === SOIL) { const d = w * dec, gap = cap[i] - n - w; w -= d; n += d; if (gap > 0) n += gap * grow; }
+    N2[i] = n; W2[i] = w;
+  }
+
+  // --- neighbour counts per species ---
+  cA.fill(0); cB.fill(0); cC.fill(0);
+  for (let y = 0, i = 0; y < G; y++) for (let x = 0; x < G; x++, i++) {
+    const s = S[i]; if (!s) continue;
+    const c = cnt[s - 1], l = x > 0, r = x < G - 1;
+    if (y > 0) { if (l) c[i - G - 1]++; c[i - G]++; if (r) c[i - G + 1]++; }
+    if (l) c[i - 1]++; if (r) c[i + 1]++;
+    if (y < G - 1) { if (l) c[i + G - 1]++; c[i + G]++; if (r) c[i + G + 1]++; }
+  }
+
+  // --- hunting: hungry C eat an adjacent A ---
+  const hunters = sim.cActive;
+  if (hunters) {
+    eaten.fill(0);
+    for (let i = 0; i < CELLS; i++) if (S[i] === 3 && E[i] < C.HUNT_HUNGER && cA[i] > 0 && rnd() < C.HUNT_CHANCE) {
+      const x = i % G, y = i / G | 0, st = rnd() * 8 | 0; let ate = false;
+      for (let k = 0; k < 8; k++) {
+        const d = (st + k) & 7, nx = x + DX8[d], ny = y + DY8[d];
+        if (nx < 0 || ny < 0 || nx >= G || ny >= G) continue;
+        const j = ny * G + nx;
+        if (S[j] === 1 && !eaten[j]) { eaten[j] = 1; E[i] += C.HUNT_GAIN; W2[i] += C.HUNT_WASTE; ate = true; break; }
+      }
+      if (ate) for (let k = 0; k < 8; k++) { // the meal is shared with the pack
+        const nx = x + DX8[k], ny = y + DY8[k]; if (nx < 0 || ny < 0 || nx >= G || ny >= G) continue;
+        const j = ny * G + nx; if (S[j] === 3) E[j] += C.HUNT_SHARE;
+      }
+    }
+  }
+
+  // --- life and death ---
+  const up = C.UPKEEP_SEASON[season] * (season === 3 ? 1 + C.WINTER_GROWTH * Math.floor(t / YT) : 1), CD = C.CROWD_DRAIN, upA = C.UPKEEP[0] * up, upB = C.UPKEEP[1] * up, upC = C.UPKEEP[2] * up;
+  const EAT = C.EAT, GAIN = C.EAT_GAIN, LEFT = 1 - C.EAT_LOSS, TOX = C.WASTE_TOXIC, DRAIN = C.WASTE_DRAIN, BF = C.BIRTH_FOOD, SE = C.SEED_ENERGY, SCH = C.SEED_CHANCE, AN = C.AGE_NORM, seeds = sim.seeds;
+  seeds.length = 0;
+  const pop = [0, 0, 0]; let sumE = 0, sumAge = 0;
+  for (let k = 0; k < 18; k++) deaths[k] *= 0.985;
+  for (let i = 0; i < CELLS; i++) {
+    if (gh[i]) gh[i] = gh[i] * 0.7 | 0;
+    const s = S[i];
+    if (s) {
+      const n = cnt[s - 1][i]; let e = E[i], cause = -1;
+      if (hunters && eaten[i]) cause = 4;
+      else if (n < 2) cause = 0;
+      else {
+        let tox = false; const crowd = n > 3 ? (n - 3) * CD : 0; // crowding never kills outright, it costs energy
+        if (s === 1) { const cost = upA + crowd; let take = N2[i] < EAT ? N2[i] : EAT; const need = 1 - e + cost; if (take > need) take = need; N2[i] -= take; W2[i] += take * LEFT; e += take * GAIN - cost; if (W2[i] > TOX) { e -= DRAIN; tox = true; } }
+        else if (s === 2) { const cost = upB + crowd; let take = W2[i] < EAT ? W2[i] : EAT; const need = 1 - e + cost; if (take > need) take = need; W2[i] -= take; N2[i] += take * LEFT; e += take * GAIN - cost; }
+        else { e -= upC + crowd; if (W2[i] > TOX) { e -= DRAIN; tox = true; } }
+        if (e <= 0) cause = tox ? 3 : crowd ? 1 : 2; else if (e > 1) e = 1;
+      }
+      if (cause >= 0) { S2[i] = 0; E2[i] = 0; A2[i] = 0; gh[i] = 255; ghS[i] = s; if (cause > 1 || A[i] > 3) deaths[(s - 1) * 6 + cause]++; } // blinker flicker does not count as a cause of death
+      else { const a = A[i] < 65535 ? A[i] + 1 : 65535; S2[i] = s; E2[i] = e; A2[i] = a; pop[s - 1]++; sumE += e; sumAge += a < AN ? a : AN; if (e >= SE[s - 1] && rnd() < SCH[s - 1]) seeds.push(i); }
+    } else {
+      let born = 0;
+      if (T[i] === SOIL) {
+        const a = cA[i], b = cB[i], c = cC[i];
+        if (a === 3 || b === 3 || c === 3) {
+          let best = 0, f;
+          if (a === 3 && (f = N2[i]) >= BF) { born = 1; best = f; }
+          if (b === 3 && (f = W2[i]) >= BF && f > best) { born = 2; best = f; }
+          if (hunters && c === 3 && a > 0 && a / 3 >= best) born = 3;
+          if (born === 1) { N2[i] -= BF; W2[i] += BF * LEFT; } else if (born === 2) { W2[i] -= BF; N2[i] += BF * LEFT; } // a birth is a big first meal
+        }
+      }
+      S2[i] = born; A2[i] = 0;
+      if (born) { E2[i] = C.BIRTH_ENERGY; pop[born - 1]++; sumE += C.BIRTH_ENERGY; } else E2[i] = 0;
+    }
+  }
+  // --- seeds: well-fed creatures plant a small figure nearby ---
+  const SR = C.SEED_RANGE, SFD = C.SEED_FOOD;
+  for (let k = 0; k < seeds.length; k++) {
+    const i = seeds[k], s = S2[i], R = s === 3 ? C.HUNT_SEED_RANGE : SR, food = s === 1 ? N2 : W2, same = cnt[s - 1];
+    for (let tries = s === 3 ? C.HUNT_SEED_TRIES : 1; tries > 0; tries--) { // Nippers aim, the others take their chances
+      const dx = (rnd() * (2 * R + 1) | 0) - R, dy = (rnd() * (2 * R + 1) | 0) - R;
+      if (dx > -3 && dx < 3 && dy > -3 && dy < 3) continue;
+      const tx = i % G + dx, ty = (i / G | 0) + dy;
+      if (tx < 0 || ty < 0 || tx >= G - 2 || ty >= G - 2) continue;
+      const j = ty * G + tx; let ok = true, prey = 0;
+      for (let q = 0; q < 9; q++) { // 3×3 free soil with no same-species neighbours, and with food
+        const c = j + q % 3 + (q / 3 | 0) * G;
+        if (T[c] !== SOIL || S2[c] || same[c] || (s < 3 && food[c] < SFD)) { ok = false; break; }
+        prey += cA[c];
+      }
+      if (!ok || (s === 3 && !prey)) continue;
+      const r = s === 3 ? 0 : rnd(), pat = r < C.SEED_SHAPES[0] ? PAT_BLOCK : r < C.SEED_SHAPES[0] + C.SEED_SHAPES[1] ? PAT_BLINKER : PAT_GLIDER;
+      const fx = rnd() < 0.5, fy = rnd() < 0.5, tr = rnd() < 0.5;
+      for (let q = 0; q < pat.length; q += 2) {
+        let px = pat[q], py = pat[q + 1]; if (tr) { const t2 = px; px = py; py = t2; } if (fx) px = 2 - px; if (fy) py = 2 - py;
+        const c = j + px + py * G; S2[c] = s; E2[c] = C.SEED_BORN; A2[c] = 0;
+      }
+      const n = pat.length / 2; E2[i] -= C.SEED_COST; pop[s - 1] += n; sumE += n * C.SEED_BORN - C.SEED_COST; break;
+    }
+  }
+  sim.N = N2; sim.N2 = N; sim.W = W2; sim.W2 = W; sim.S = S2; sim.S2 = S; sim.E = E2; sim.E2 = E; sim.AGE = A2; sim.AGE2 = A;
+  const tot = pop[0] + pop[1] + pop[2];
+  sim.pop = pop; sim.health = tot ? 100 * (sumE / tot) * (sumAge / tot / AN) : 0;
+  sim.tick = t + 1;
+  if (sim.tick % C.HIST_EVERY === 0) { sim.hA.push(pop[0]); sim.hB.push(pop[1]); sim.hC.push(pop[2]); sim.hH.push(sim.health); }
+  const dead = pop[0] === 0 ? 0 : pop[1] === 0 ? 1 : -1;
+  if (dead >= 0 && !sim.over) {
+    let cause = 2, m = -1; for (let k = 0; k < 6; k++) if (deaths[dead * 6 + k] > m) { m = deaths[dead * 6 + k]; cause = k; }
+    sim.over = { sp: dead, tick: sim.tick, season, cause };
+  }
+}
+
+// Pour nutrient (sp 1, for Gobblers) or waste (sp 2, for Mulchers) on one cell. Returns [amount used, hungry fed, born].
+// A creature of that species eats straight from the hand; empty soil next to two of them sprouts a newborn at once.
+function pourCell(sim, i, sp, have) {
+  const C = sim.cfg, F = sp === 1 ? sim.N : sim.W, P = sp === 1 ? sim.W : sim.N, s = sim.S[i], LEFT = 1 - C.EAT_LOSS;
+  let add = Math.min(C.FERT_AMOUNT, have); if (add <= 0) return [0, 0, 0];
+  if (s === sp) {
+    const hungry = sim.E[i] < 0.4 ? 1 : 0, eat = Math.min(add, 1 - sim.E[i]), rest = Math.max(0, Math.min(add - eat, 1 - F[i]));
+    sim.E[i] += eat; P[i] += eat * LEFT; F[i] += rest; return [eat + rest, hungry, 0];
+  }
+  add = Math.min(add, 1 - F[i]); if (add <= 0) return [0, 0, 0]; F[i] += add;
+  if (!s && sim.terrain[i] === SOIL && sim.cnt[sp - 1][i] >= 2 && F[i] >= C.BIRTH_FOOD) {
+    sim.S[i] = sp; sim.E[i] = C.BIRTH_ENERGY; sim.AGE[i] = 0; F[i] -= C.BIRTH_FOOD; P[i] += C.BIRTH_FOOD * LEFT; return [add, 0, 1];
+  }
+  return [add, 0, 0];
+}
+//</SIM>
+
+/* ============================ UI ============================ */
+(() => {
+let C = CONFIG; const $ = id => document.getElementById(id); // C becomes the run's own config in newGame
+const SEASONS = ['Spring', 'Summer', 'Autumn', 'Winter'], ICONS = ['🌱', '☀️', '🍂', '❄️'], GLOW = ['#7fd66b', '#f2c744', '#e07a35', '#9cc6ee'];
+const NAMES = ['The Gobblers', 'The Mulchers'];
+const cv = $('world'); cv.width = cv.height = G; const ctx = cv.getContext('2d'), img = ctx.createImageData(G, G), px = img.data, view = $('view');
+const noise = new Int8Array(CELLS), frost = new Uint8Array(CELLS), mask = new Uint8Array(CELLS), flash = new Uint8Array(CELLS), flashC = new Uint8Array(CELLS), pulse = new Uint8Array(CELLS); // fading tool feedback; flashC: 0 feed, 1 scoop, 2 muck; pulse: a creature just ate or was born
+const FLASH = [[150, 255, 90], [255, 150, 40], [225, 120, 255]];
+for (let i = 0; i < CELLS; i++) { const h = Math.imul(i ^ 0x9E3779B9, 0x85EBCA6B) >>> 0; noise[i] = (h >>> 8) % 9 - 4; frost[i] = (h >>> 16) % 19 === 0 ? 1 : 0; }
+
+let sim, paused = false, speed = 1, overlay = false, tool = 'feed', zoom = 1, panX = 0, panY = 0, size = 320;
+let resN, resW, world = null, pb = 0, goal = null, stars = 0, scooped = 0, poured = 0, stroke = null, modals = 0, acc = 0, last = 0, sayTimer = 0, bannerTimer = 0, lastSayTick = -999, said = {};
+const store = { get: k => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
+
+/* ---------- sound: tiny synth blips, no files ---------- */
+let ac = null, muted = store.get('kretslopp_mute') === '1', sfxAt = 0;
+const SFX = { // [frequency or melody, seconds per note, wave]
+  scoop: [330, .05, 'triangle'], feed: [660, .06, 'sine'], muck: [150, .07, 'square'], stone: [110, .05, 'square'], water: [520, .05, 'sine'], soil: [200, .04, 'triangle'],
+  fed: [[880, 1175], .06, 'sine'], born: [[1047, 1568], .05, 'triangle'], goal: [[660, 880, 1320], .1, 'triangle'], gift: [[523, 659, 784, 1047], .09, 'triangle'], record: [[784, 988, 1175, 1568], .1, 'triangle'],
+  season: [[440, 330], .15, 'sine'], warn: [[220, 220], .12, 'sawtooth'], danger: [70, .09, 'sine'], over: [[392, 330, 262, 196], .22, 'sine'],
+};
+function sfx(name) {
+  if (muted || !ac || !SFX[name]) return; const [f, d, type] = SFX[name], vol = type === 'sine' || type === 'triangle' ? 0.12 : 0.05;
+  [].concat(f).forEach((hz, k) => {
+    const o = ac.createOscillator(), g = ac.createGain(), t = ac.currentTime + k * d; o.type = type; o.frequency.value = hz;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + d * 1.6);
+    o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t + d * 1.7);
+  });
+}
+addEventListener('pointerdown', () => { try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); ac.resume(); } catch (e) {} }, true); // browsers only allow sound after a tap
+function setMuted(m) { muted = m; $('mute').textContent = m ? '🔇' : '🔊'; store.set('kretslopp_mute', m ? '1' : '0'); }
+
+/* ---------- narrator ---------- */
+function say(txt, ms = 4200) { const el = $('say'); el.textContent = txt; el.classList.add('on'); clearTimeout(sayTimer); sayTimer = setTimeout(() => el.classList.remove('on'), ms); lastSayTick = sim ? sim.tick : 0; }
+function banner(txt, ms = 5200) { const el = $('banner'); el.textContent = txt; el.classList.add('on'); clearTimeout(bannerTimer); bannerTimer = setTimeout(() => el.classList.remove('on'), ms); }
+function once(key, txt) { if (said[key]) return; said[key] = 1; say(txt); }
+const pick = a => a[Math.random() * a.length | 0];
+const SEASON_LINES = [
+  ['Spring. Everything is sprouting, including the problems.', 'Spring is here. The Gobblers have already forgotten winter.', 'Spring again. Nobody has learned anything.'],
+  ['Summer. Everything grows and everyone thinks life is easy. Scoop while it lasts.', 'Summer! The compost is working overtime.', 'Summer. Enjoy it, it passes.'],
+  ['Autumn. An excellent time to fill the reservoir.', 'Autumn. Winter is visible on the meter and it does not look friendly.', 'Autumn is here. The Gobblers have not packed.'],
+  ['Winter. Upkeep rises and the compost is on strike.', 'Winter. Now is when you feed them, if you scooped anything to feed them with.', 'Winter. Everyone is hungry and nobody is surprised except the Gobblers.'],
+];
+const QUIPS = [
+  'A Mulcher just ate waste and called it brunch.', 'The Gobblers voted on eating less. The motion failed.', 'Somewhere a blinker is blinking, perfectly content.',
+  'Nature is in balance. Temporarily. By accident.', 'Muck on a Gobbler is poison. Muck on a Mulcher is lunch.', 'Crowds are hungry. Thin colonies are lonely. Nobody is ever happy.', 'A Gobbler ponders the meaning of life: three neighbours.', 'The Mulchers say thanks for the food. Nobody else does.',
+  'Dense colony = bad air, says new research from everyone.', 'Scooped soil grows back in summer. In winter it just stays scooped.', 'A boulder lies still and silently judges everyone.',
+  'The reservoir is not a pension plan, but almost.', 'Tip: water moves nutrient fast – including to places you did not intend.', 'A glider just left the meadow to "find itself".',
+];
+function narrate() {
+  const t = sim.tick, [a, b, c] = sim.pop, ST = C.SEASON_TICKS, se = Math.floor(t / ST) % 4, f = (t % ST) / ST;
+  if (se === 2 && f > 0.6 && f < 0.63) say('Winter is coming. Scoop now, feed later.');
+  else if (a > 0 && a < 100 && a <= b) once('lowA' + (t / 600 | 0), 'The Gobblers are running low. Save the rarer species first: Feed 🌿 right on top of them.');
+  else if (b > 0 && b < 100 && b < a) once('lowB' + (t / 600 | 0), 'The Mulchers are running low. Save the rarer species first: Muck 💩 right on top of them.');
+  else if (t === 60) once('tip1', 'Tip: dim creatures are hungry. Feed 🌿 the yellow ones, Muck 💩 the blue ones.');
+  else if (t === 200) once('tip2', 'Tip: Scoop 🧺 where the ground glows green or purple and nobody lives. It grows back.');
+  else if (a > 2500) once('bigA' + (t / 600 | 0), 'The Gobblers celebrate a record population. That usually ends one way.');
+  else if (sim.health < 20 && t > 100) once('sick' + (t / 600 | 0), 'Health is dropping. Someone should do something. (You.)');
+  else if (t - lastSayTick > 260 && t % 20 === 0) say(pick(QUIPS));
+}
+function drainMessages() {
+  const secs = Math.round(C.EVENT_WARN / (C.TICKS_PER_SEC * speed));
+  for (const m of sim.out) {
+    if (m.k === 'season') { say(pick(SEASON_LINES[m.season])); sfx('season'); }
+    else if (m.k === 'warn') sfx('warn'), banner(m.type === 'drought' ? `🏜 Drought in ${secs} s – the water is going on holiday` : `🌊 Flood in ${secs} s – nutrient near water will be washed away`);
+    else if (m.k === 'event') say(m.type === 'drought' ? 'Drought! The water behaves like soil and is a little ashamed.' : 'Flood! The water spreads out without asking.');
+    else if (m.k === 'eventEnd') say(m.type === 'drought' ? 'The drought is over. The water is back from holiday.' : 'The water retreats and pretends nothing happened.');
+    else if (m.k === 'hunters') sfx('warn'), banner(m.again ? '🦷 The Nippers are back, and they brought friends.' : '🦷 The Nippers have arrived. They eat Gobblers and do not apologise.', 7000);
+    else if (m.k === 'year' && !sim.over) openBoons('🎁 Year ' + m.year);
+  }
+  sim.out.length = 0;
+}
+
+/* ---------- rendering ---------- */
+const PAL = [[33, 30, 22], [42, 33, 20], [45, 29, 18], [41, 44, 54]];
+const SPC = [[255, 198, 56], [70, 225, 255], [255, 72, 128]];
+function render(now) {
+  const T = sim.terrain, N = sim.N, W = sim.W, S = sim.S, E = sim.E, AG = sim.AGE, gh = sim.ghost, ghS = sim.ghostS, flood = sim.flood;
+  const t = sim.tick, ST = C.SEASON_TICKS, se = Math.floor(t / ST) % 4, f = (t % ST) / ST, k = f > 0.8 ? (f - 0.8) / 0.2 : 0;
+  const a = PAL[se], b = PAL[(se + 1) % 4], sr = a[0] + (b[0] - a[0]) * k, sg = a[1] + (b[1] - a[1]) * k, sb = a[2] + (b[2] - a[2]) * k;
+  const winter = se === 3 ? 1 - k : se === 2 ? k : 0;
+  const drought = sim.event && sim.event.type === 'drought', flooding = sim.event && sim.event.type === 'flood', time = now * 0.002;
+  for (let y = 0, i = 0, p = 0; y < G; y++) for (let x = 0; x < G; x++, i++, p += 4) {
+    const tt = T[i], nz = noise[i]; let r, g, bl, n = N[i], w = W[i];
+    n = n > 1 ? 1 : Math.sqrt(n); w = w > 1 ? 1 : Math.sqrt(w); // square root: low levels should be visible too
+    if (tt === STONE) {
+      let v = 112 + nz * 3; if (y > 0 && T[i - G] !== STONE) v += 26; if (y < G - 1 && T[i + G] !== STONE) v -= 30;
+      r = v * 0.96 + winter * 12; g = v * 0.98 + winter * 12; bl = v * 1.05 + winter * 16;
+    } else if (tt === WATER) {
+      if (drought) { r = 126 + nz * 3; g = 104 + nz * 3 + n * 26; bl = 70 + w * 40; }
+      else { const sh = Math.sin(x * 0.55 + y * 0.35 + time) * Math.sin(y * 0.4 - x * 0.2 + time * 0.7); r = 20 + w * 80 + sh * 8 + winter * 60; g = 80 + n * 80 + sh * 14 + winter * 55; bl = 170 + sh * 24 - n * 40 + winter * 30; }
+    } else {
+      r = sr + nz + n * 4 + w * 84; g = sg + nz + n * 104 + w * 8; bl = sb + nz + n * 22 + w * 72;
+      if (winter && frost[i]) { r += 34 * winter; g += 36 * winter; bl += 44 * winter; }
+      if (flooding && flood[i]) { const sh = Math.sin(x * 0.55 + y * 0.35 + time) * 10; r = r * 0.45 + 12; g = g * 0.45 + 46 + sh; bl = bl * 0.45 + 96 + sh; }
+    }
+    if (overlay) { const l = (r + g + bl) * 0.12; r = l; g = l; bl = l * 1.25; }
+    const s = S[i];
+    if (s) {
+      const e = E[i];
+      if (overlay) { if (e < 0.5) { r = 255; g = 60 + e * 2 * 160; bl = 50; } else { r = 255 - (e - 0.5) * 2 * 195; g = 220 + (e - 0.5) * 20; bl = 50 + (e - 0.5) * 2 * 60; } }
+      else { const c = SPC[s - 1], m = 0.38 + 0.62 * e; r = c[0] * m; g = c[1] * m; bl = c[2] * m; if (AG[i] < 2) { r = r * 0.5 + 128; g = g * 0.5 + 128; bl = bl * 0.5 + 128; }
+        if (pulse[i]) { const q = pulse[i] / 255; r += (255 - r) * q; g += (255 - g) * q; bl += (255 - bl) * q; pulse[i] = pulse[i] > 14 ? pulse[i] - 14 : 0; } // just ate from your hand, or just born
+        else if (e < 0.25 && AG[i] >= 2) { const q = (0.25 - e) * 4 * (0.5 + 0.5 * Math.sin(now * 0.012 + i)); r += (255 - r) * q; g *= 1 - q * 0.75; bl *= 1 - q * 0.75; } } // starving: blink red
+    } else if (gh[i] && !overlay) { const c = SPC[ghS[i] - 1], m = gh[i] / 255 * 0.4; r += (c[0] - r) * m; g += (c[1] - g) * m; bl += (c[2] - bl) * m; }
+    const fl = flash[i];
+    if (fl) { const m = fl / 255 * 0.75, c = FLASH[flashC[i]]; r += (c[0] - r) * m; g += (c[1] - g) * m; bl += (c[2] - bl) * m; flash[i] = fl > 8 ? fl - 8 : 0; }
+    px[p] = r; px[p + 1] = g; px[p + 2] = bl; px[p + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
+/* ---------- HUD ---------- */
+function updateHud() {
+  const t = sim.tick, ST = C.SEASON_TICKS, YT = ST * 4, se = Math.floor(t / ST) % 4;
+  if (document.body.dataset.s !== '' + se) { document.body.dataset.s = se; document.documentElement.style.setProperty('--season', GLOW[se]); }
+  $('seasonIcon').textContent = ICONS[se]; $('seasonName').textContent = SEASONS[se]; $('yearLbl').textContent = 'Year ' + (Math.floor(t / YT) + 1) + ' · ' + world[0];
+  $('wheelPos').style.left = (t % YT) / YT * 100 + '%';
+  $('nextLbl').textContent = SEASONS[(se + 1) % 4] + ' in ' + Math.ceil((ST - t % ST) / (C.TICKS_PER_SEC * speed)) + ' s';
+  $('healthVal').textContent = Math.round(sim.health); $('healthBar').style.width = Math.min(100, sim.health) + '%';
+  $('popA').textContent = 'Gobblers ' + sim.pop[0]; $('popB').textContent = 'Mulchers ' + sim.pop[1];
+  $('popC').textContent = sim.cActive ? (sim.pop[2] ? 'Nippers ' + sim.pop[2] : 'Nippers gone (for now)') : t / YT + 1 >= C.C_UNLOCK_YEAR ? 'Nippers: too little prey' : 'Nippers 🔒 year ' + C.C_UNLOCK_YEAR;
+  document.body.classList.toggle('danger', sim.tick > 5 && !sim.over && Math.min(sim.pop[0], sim.pop[1]) < 40);
+  const rec = pb && t > pb, el = $('pb'); el.className = rec ? 'new' : '';
+  el.textContent = rec ? '🏆 New record!' : pb ? '🏆 Record: year ' + (Math.floor(pb / YT) + 1) + ', ' + SEASONS[Math.floor(pb % YT / ST)].toLowerCase() : '';
+  updateMeters();
+}
+function updateMeters() {
+  $('resNVal').textContent = resN.toFixed(1); $('resNBar').style.width = resN / C.RESERVOIR_MAX * 100 + '%';
+  $('resWVal').textContent = resW.toFixed(1); $('resWBar').style.width = resW / C.RESERVOIR_MAX * 100 + '%';
+}
+function fit(c) { const d = Math.min(2, window.devicePixelRatio || 1), w = c.clientWidth, h = c.clientHeight; c.width = w * d; c.height = h * d; const x = c.getContext('2d'); x.setTransform(d, 0, 0, d, 0, 0); return [x, w, h]; }
+function drawSpark() {
+  const [x, w, h] = fit($('spark')), n = sim.hA.length, from = Math.max(0, n - 90), cnt = n - from; if (cnt < 2) return;
+  let max = 1; for (let i = from; i < n; i++) max = Math.max(max, sim.hA[i], sim.hB[i], sim.hC[i]);
+  [[sim.hA, '#ffc638'], [sim.hB, '#46e1ff'], [sim.hC, '#ff4880']].forEach(([arr, col], si) => {
+    if (si === 2 && !sim.cActive) return;
+    x.beginPath(); for (let i = from; i < n; i++) { const X = (i - from) / (cnt - 1) * (w - 2) + 1, Y = h - 2 - arr[i] / max * (h - 4); i === from ? x.moveTo(X, Y) : x.lineTo(X, Y); }
+    x.strokeStyle = col; x.lineWidth = 1.5; x.lineJoin = 'round'; x.stroke();
+  });
+}
+
+/* ---------- view: scaling, zoom, panning ---------- */
+function resize() { const r = $('stage').getBoundingClientRect(); size = Math.max(120, Math.floor(Math.min(r.width, r.height))); view.style.width = view.style.height = cv.style.width = cv.style.height = size + 'px'; applyView(); if (sim) drawSpark(); }
+function applyView() { const m = size * (zoom - 1); panX = Math.max(0, Math.min(m, panX)); panY = Math.max(0, Math.min(m, panY)); cv.style.transform = `translate(${-panX}px,${-panY}px) scale(${zoom})`; }
+function setZoom(z, mx = size / 2, my = size / 2) { z = Math.max(1, Math.min(6, z)); const wx = (mx + panX) / zoom, wy = (my + panY) / zoom; zoom = z; panX = wx * z - mx; panY = wy * z - my; applyView(); }
+function local(e) { const r = view.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+function cellAt(e) { const [x, y] = local(e); return [Math.floor((x + panX) / (size * zoom) * G), Math.floor((y + panY) / (size * zoom) * G)]; }
+
+/* ---------- tools ---------- */
+function beginStroke() { stroke = { idx: [], t: [], dn: [], dw: [], rn: 0, rw: 0, fed: 0, born: 0, squash: [], full: false, empty: false }; }
+function applyCell(i) {
+  const T = sim.terrain, old = T[i]; let dn = 0, dw = 0;
+  if (tool === 'stone' || tool === 'water') {
+    const nt = tool === 'stone' ? STONE : WATER;
+    if (old === nt) return; T[i] = nt;
+    const s = sim.S[i]; if (s) { stroke.squash.push(i, s, sim.E[i], sim.AGE[i]); sim.S[i] = 0; sim.E[i] = 0; sim.ghost[i] = 255; sim.ghostS[i] = s; sim.deaths[(s - 1) * 6 + 5]++; }
+  } else if (tool === 'soil') { if (old === SOIL) return; T[i] = SOIL; }
+  else if (tool === 'scoop') {
+    if (old === STONE) return; const roomN = C.RESERVOIR_MAX - resN, roomW = C.RESERVOIR_MAX - resW; if (roomN <= 1e-6 && roomW <= 1e-6) { stroke.full = true; return; }
+    const keep = 1 - C.SCOOP_LOSS, hn = Math.min(sim.N[i] * C.HARVEST_FRAC, roomN / keep), hw = Math.min(sim.W[i] * C.HARVEST_FRAC, roomW / keep); if (hn + hw <= 1e-3) return;
+    sim.N[i] -= hn; sim.W[i] -= hw; resN += hn * keep; resW += hw * keep; scooped += (hn + hw) * keep; stroke.rn += hn * keep; stroke.rw += hw * keep; dn = -hn; dw = -hw; flash[i] = 255; flashC[i] = 1;
+  } else if (tool === 'feed' || tool === 'muck') {
+    const feed = tool === 'feed', have = feed ? resN : resW;
+    if (old === STONE) return; if (have <= 1e-6) { stroke.empty = true; return; }
+    const [add, fed, born] = pourCell(sim, i, feed ? 1 : 2, have); if (add <= 0) return;
+    flash[i] = 255; poured += add; stroke.fed += fed; stroke.born += born; if (fed || born) pulse[i] = 255; // shortcut: a cancelled stroke keeps its newborns, fix if pinch-cancel gets abused
+    if (feed) { resN -= add; stroke.rn -= add; dn = add; flashC[i] = 0; } else { resW -= add; stroke.rw -= add; dw = add; flashC[i] = 2; }
+  } else return;
+  mask[i] = 1; stroke.idx.push(i); stroke.t.push(old); stroke.dn.push(dn); stroke.dw.push(dw);
+}
+function stamp(cx, cy) {
+  const R = C.BRUSH, lim = R * R + R * 0.8;
+  for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) {
+    if (dx * dx + dy * dy > lim) continue; const x = cx + dx, y = cy + dy; if (x < 0 || y < 0 || x >= G || y >= G) continue;
+    const i = y * G + x; if (!mask[i]) applyCell(i);
+  }
+}
+function strokeTo(x0, y0, x1, y1) { const n0 = stroke.idx.length, f0 = stroke.fed, b0 = stroke.born, n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)), st = Math.max(1, C.BRUSH); for (let s = st; s < n; s += st) stamp(Math.round(x0 + (x1 - x0) * s / n), Math.round(y0 + (y1 - y0) * s / n)); stamp(x1, y1); updateMeters();
+  if (stroke.idx.length > n0 && performance.now() - sfxAt > 70) { sfxAt = performance.now(); sfx(stroke.born > b0 ? 'born' : stroke.fed > f0 ? 'fed' : tool); if (navigator.vibrate) navigator.vibrate(5); } }
+function endStroke(cancel) {
+  if (!stroke) return; const s = stroke; stroke = null;
+  for (const i of s.idx) mask[i] = 0;
+  if (cancel) { revert(s); return; }
+  if (s.squash.length) say(s.squash.length === 4 ? 'You squashed a resident. It had plans.' : `You squashed ${s.squash.length / 4} residents. They had plans.`);
+  else if (s.fed || s.born) { run.fed += s.fed; say((tool === 'feed' ? '🌿 ' : '💩 ') + (s.fed ? s.fed + ' hungry fed' : '') + (s.fed && s.born ? ', ' : '') + (s.born ? s.born + ' born' : '') + '.', 2200); }
+  else if (s.full) say('Both reservoirs are full. Greed has a limit, apparently.');
+  else if (s.empty) say(tool === 'feed' ? 'No nutrient in the reservoir. Scoop 🧺 some first, where the ground is green.' : 'No waste in the reservoir. Scoop 🧺 some first, where the ground is purple.');
+  else if (tool === 'scoop' && s.rn + s.rw > 15) once('greedy', 'Hefty scoop. Whoever lived off that will notice, just so you know.');
+  updateMeters();
+}
+function revert(s) {
+  for (let k = 0, q = s.squash; k < q.length; k += 4) { const i = q[k]; sim.S[i] = q[k + 1]; sim.E[i] = q[k + 2]; sim.AGE[i] = q[k + 3]; sim.ghost[i] = 0; sim.deaths[(q[k + 1] - 1) * 6 + 5]--; } // a cancelled stroke squashed nobody
+  for (let k = 0; k < s.idx.length; k++) { const i = s.idx[k]; sim.terrain[i] = s.t[k]; sim.N[i] = Math.max(0, sim.N[i] - s.dn[k]); sim.W[i] = Math.max(0, sim.W[i] - s.dw[k]); }
+  resN = Math.max(0, Math.min(C.RESERVOIR_MAX, resN - s.rn)); resW = Math.max(0, Math.min(C.RESERVOIR_MAX, resW - s.rw)); updateMeters();
+}
+
+/* ---------- pointers ---------- */
+const ptrs = new Map(); let drag = null, pinch = null, lastCell = null;
+function pinchState() { const [p, q] = [...ptrs.values()]; return { d: Math.hypot(p[0] - q[0], p[1] - q[1]) || 1, mx: (p[0] + q[0]) / 2, my: (p[1] + q[1]) / 2 }; }
+view.addEventListener('pointerdown', e => {
+  e.preventDefault(); try { view.setPointerCapture(e.pointerId); } catch (_) {}
+  ptrs.set(e.pointerId, local(e));
+  if (ptrs.size === 2) { endStroke(true); drag = null; pinch = pinchState(); return; }
+  if (ptrs.size > 2 || sim.over) return;
+  if (tool === 'pan' || e.button === 1 || e.button === 2) { if (zoom === 1) say('Zoom in first, then there is something to pan.'); drag = { x: e.clientX, y: e.clientY, px: panX, py: panY }; return; }
+  beginStroke(); lastCell = cellAt(e); strokeTo(lastCell[0], lastCell[1], lastCell[0], lastCell[1]);
+});
+view.addEventListener('pointermove', e => {
+  if (!ptrs.has(e.pointerId)) return; ptrs.set(e.pointerId, local(e));
+  if (pinch && ptrs.size === 2) { const n = pinchState(); panX += pinch.mx - n.mx; panY += pinch.my - n.my; setZoom(zoom * n.d / pinch.d, n.mx, n.my); pinch = n; }
+  else if (drag) { panX = drag.px - (e.clientX - drag.x); panY = drag.py - (e.clientY - drag.y); applyView(); }
+  else if (stroke) { const c = cellAt(e); if (c[0] !== lastCell[0] || c[1] !== lastCell[1]) { strokeTo(lastCell[0], lastCell[1], c[0], c[1]); lastCell = c; } }
+});
+const up = e => { ptrs.delete(e.pointerId); if (ptrs.size < 2) pinch = null; if (!ptrs.size) { drag = null; endStroke(false); } };
+view.addEventListener('pointerup', up); view.addEventListener('pointercancel', up);
+view.addEventListener('contextmenu', e => e.preventDefault());
+view.addEventListener('wheel', e => { e.preventDefault(); const [x, y] = local(e); setZoom(zoom * (e.deltaY < 0 ? 1.25 : 0.8), x, y); }, { passive: false });
+
+/* ---------- buttons ---------- */
+function setTool(t) { tool = t; document.querySelectorAll('#tools button').forEach(b => b.classList.toggle('on', b.dataset.t === t)); view.style.cursor = t === 'pan' ? 'grab' : 'crosshair'; }
+function setPaused(p) { paused = p; $('pause').textContent = p ? '▶' : '⏸'; $('pause').classList.toggle('on', p); }
+function toggleHeat() { overlay = !overlay; $('heat').classList.toggle('on', overlay); if (overlay) once('heat', 'Health map: green is doing fine, red regrets its life choices.'); }
+document.querySelectorAll('#tools button').forEach(b => b.onclick = () => setTool(b.dataset.t));
+$('pause').onclick = () => setPaused(!paused); $('heat').onclick = toggleHeat; $('mute').onclick = () => setMuted(!muted); setMuted(muted);
+$('speed').onclick = () => { speed = speed === 1 ? 2 : speed === 2 ? 0.5 : 1; $('speed').textContent = (speed < 1 ? '½' : speed) + '×'; updateHud(); };
+$('zin').onclick = () => setZoom(zoom * 1.5); $('zout').onclick = () => setZoom(zoom / 1.5);
+function openModal(id) { const m = $(id); if (!m.classList.contains('open')) { m.classList.add('open'); modals++; } }
+function closeModal(id) { const m = $(id); if (m.classList.contains('open')) { m.classList.remove('open'); modals--; } }
+$('rulesBtn').onclick = () => openModal('rules');
+document.querySelectorAll('[data-close]').forEach(b => b.onclick = () => { const id = b.closest('.modal').id; closeModal(id); if (id === 'intro') store.set('kretslopp_intro', '1'); });
+addEventListener('keydown', e => {
+  const k = e.key.toLowerCase(), tools = ['scoop', 'feed', 'muck', 'stone', 'water', 'soil', 'pan'];
+  if (k === ' ') { e.preventDefault(); setPaused(!paused); } else if (k >= '1' && k <= '7') setTool(tools[k - 1]);
+  else if (k === 'h') toggleHeat(); else if (k === 'm') setMuted(!muted); else if (k === '+' || k === '=') setZoom(zoom * 1.5); else if (k === '-') setZoom(zoom / 1.5);
+});
+
+/* ---------- worlds and gifts: what makes one run differ from the next ---------- */
+const WORLDS = [ // [name, intro line, config changes, lifetime years survived (all runs) needed to unlock]
+  ['Meadow', 'A small meadow. Two species. What could go wrong?', {}, 0],
+  ['Lush', 'Rich soil, wild weather: expect a drought or a flood every year.', { SOIL_RICH: 1, EVENT_CHANCE: 1 }, 2],
+  ['Rocky', 'Boulder country. Less room for everyone, including you.', { STONES: 26 }, 5],
+  ['Wetlands', 'Three streams. Food travels fast here – and floods travel faster.', { STREAMS: 3 }, 9],
+  ['Compost heap', 'This meadow starts knee-deep in waste. The Mulchers call it paradise.', { START_WASTE_FRAC: 0.75 }, 14],
+  ['Thin soil', 'Poor soil, but someone left you bigger buckets.', { SOIL_RICH: 0.58, RESERVOIR_MAX: 130 }, 20],
+  ['Nipper country', 'The Nippers do not wait for year 3 around here. They come in year 2.', { C_UNLOCK_YEAR: 2 }, 27],
+];
+const YEAR = CONFIG.SEASON_TICKS * 4;
+let life = +store.get('kretslopp_life') || loadRuns().reduce((a, r) => a + (+r.t || 0), 0); // ticks survived over all runs; old board entries count
+const openWorlds = () => WORLDS.filter(w => life / YEAR >= w[3]);
+const BOONS = [
+  ['🪣', 'Bigger buckets', 'Both reservoirs hold 50% more.', c => c.RESERVOIR_MAX *= 1.5],
+  ['🧤', 'Steady hands', 'You spill half as much when you scoop.', c => c.SCOOP_LOSS /= 2],
+  ['🥄', 'Deep scoop', 'Scoop takes three quarters of a cell instead of half.', c => c.HARVEST_FRAC = 0.75, () => C.HARVEST_FRAC < 0.75],
+  ['🧥', 'Thick fur', 'Winter upkeep is 15% lower.', c => { c.UPKEEP_SEASON = c.UPKEEP_SEASON.slice(); c.UPKEEP_SEASON[3] *= 0.85; }],
+  ['♨️', 'Hot compost', 'Waste rots into nutrient three times faster.', c => c.DECOMP *= 3],
+  ['🌱', 'Rich soil', 'Soil regrows nutrient 20% faster.', c => c.GROW *= 1.2],
+  ['♻️', 'Clean plates', 'A fifth less of every meal is wasted.', c => c.EAT_LOSS *= 0.8],
+  ['🤢', 'Iron stomachs', 'Gobblers and Nippers tolerate far more waste.', c => c.WASTE_TOXIC += 0.3],
+  ['⛱', 'Weatherproof', 'Droughts and floods last half as long.', c => { c.DROUGHT_TICKS >>= 1; c.FLOOD_TICKS >>= 1; }],
+  ['🦷', 'Dull teeth', 'Nippers bite half as often.', c => c.HUNT_CHANCE /= 2, () => sim.tick / YEAR + 2 >= C.C_UNLOCK_YEAR],
+  ['🎁', 'Care package', 'Both reservoirs filled to the brim. Right now.', c => { resN = resW = c.RESERVOIR_MAX; }],
+];
+let boonAt = 0; const boonQ = [];
+function openBoons(title) {
+  if ($('boon').classList.contains('open')) { boonQ.push(title); return; } // a year gift and a bonus gift can land on the same tick
+  endStroke(false);
+  const pool = BOONS.filter(b => !b[4] || b[4]()), list = $('boonList'); list.textContent = '';
+  $('boonTitle').textContent = title;
+  for (let k = 0; k < 3; k++) {
+    const b = pool.splice(Math.random() * pool.length | 0, 1)[0], el = document.createElement('button');
+    el.innerHTML = `<span>${b[0]}</span><div><b>${b[1]}</b>${b[2]}</div>`;
+    el.onclick = () => { // the delay stops a stray paint tap from picking
+      if (performance.now() - boonAt < 700) return; b[3](C); closeModal('boon'); updateMeters(); say(b[0] + ' ' + b[1] + '. ' + b[2]); sfx('gift');
+      if (boonQ.length) openBoons(boonQ.shift());
+    };
+    list.appendChild(el);
+  }
+  boonAt = performance.now(); openModal('boon');
+}
+
+/* ---------- medals: things to collect across runs ---------- */
+const MEDALS = [ // [id, icon, name, how to earn it, earned right now?]
+  ['y3', '🥉', 'Three winters', 'Survive 3 years.', () => sim.tick >= 3 * YEAR],
+  ['y5', '🥈', 'Five winters', 'Survive 5 years.', () => sim.tick >= 5 * YEAR],
+  ['y8', '🥇', 'Eight winters', 'Survive 8 years.', () => sim.tick >= 8 * YEAR],
+  ['fed', '🍽', 'Soup kitchen', 'Feed 150 hungry creatures in one run.', () => run.fed >= 150],
+  ['goals', '🌟', 'Overachiever', 'Finish 6 goals in one run.', () => run.goals >= 6],
+  ['boom', '🎉', 'Baby boom', 'Have 2000 creatures alive at once after the first spring.', () => sim.tick > 300 && sim.pop[0] + sim.pop[1] >= 2000],
+  ['nip', '🦷', 'Pest control', 'Outlast a Nipper pack that grew to 100.', () => run.nipGone],
+  ['edge', '😅', 'Close call', 'Drop below 10 of a species, then last another year.', () => run.low > 0 && sim.tick - run.low >= YEAR],
+];
+let medals = (store.get('kretslopp_medals') || '').split(',').filter(Boolean), run = {};
+function checkMedals() {
+  for (const m of MEDALS) if (!medals.includes(m[0]) && m[4]()) {
+    medals.push(m[0]); run.medals.push(m[0]); store.set('kretslopp_medals', medals.join(',')); banner(`🏅 Medal: ${m[2]} – ${m[3]}`, 5000); sfx('goal');
+  }
+}
+
+/* ---------- goals: one small job per season; three stars = a bonus gift ---------- */
+function newGoal() {
+  const se = Math.floor(sim.tick / C.SEASON_TICKS) % 4, round = n => Math.max(10, Math.round(n / 10) * 10), weak = sim.pop[0] < sim.pop[1] ? 0 : 1;
+  scooped = poured = 0;
+  const reach = { txt: `Reach ${round(sim.pop[weak] * 1.6 + 30)} ${weak ? 'Mulchers' : 'Gobblers'}`, cur: () => sim.pop[weak], target: round(sim.pop[weak] * 1.6 + 30) };
+  const low = round(Math.min(sim.pop[0], sim.pop[1]) * [0.9, 0.8, 0.6, 0.4][se]);
+  const hold = { txt: `End ${SEASONS[se].toLowerCase()} with ${low}+ of each`, cur: () => Math.min(sim.pop[0], sim.pop[1]), target: low, atEnd: true };
+  const scoop = { txt: 'Scoop 60 into the reservoirs', cur: () => scooped, target: 60 }, pour = { txt: 'Hand out 50 of Feed or Muck', cur: () => poured, target: 50 };
+  goal = sim.tick ? pick([[reach, scoop], [scoop, hold], [hold, scoop, pour], [hold, pour]][se]) : scoop; // the very first goal teaches scooping
+}
+function checkGoal() {
+  const end = sim.tick > 0 && sim.tick % C.SEASON_TICKS === 0;
+  if (!goal.done && goal.cur() >= goal.target && (end || !goal.atEnd)) {
+    goal.done = true; stars++; run.goals++; sfx('goal'); const st = $('stars'); st.classList.remove('pop'); void st.offsetWidth; st.classList.add('pop'); banner('⭐ Goal done: ' + goal.txt, 3500);
+    if (stars >= 3) { stars = 0; openBoons('⭐⭐⭐ Bonus gift'); }
+  }
+  if (end) { if (!goal.done) say('Goal missed: ' + goal.txt + '. Nature shrugs.'); newGoal(); }
+  $('goalTxt').textContent = goal.done ? '✅ ' + goal.txt : '🎯 ' + goal.txt + ' · ' + Math.floor(goal.cur()) + '/' + goal.target;
+  $('goalCard').style.setProperty('--p', (goal.done ? 100 : Math.min(100, goal.cur() / goal.target * 100)) + '%');
+  $('stars').textContent = '⭐'.repeat(stars) + '☆'.repeat(3 - stars);
+}
+
+/* ---------- end screen ---------- */
+const CAUSES = [
+  ['loneliness – too few neighbours, too many opinions', 'loneliness – nobody to share the rubbish with'],
+  ['crowding – they were literally standing on each other', 'crowding – too many cooks in the compost'],
+  ['starvation – the nutrient ran out where they lived', 'starvation – too little waste. Yes, you can have too little waste'],
+  ['poisoning – they drowned in their own waste', 'poisoning (which should be impossible, congratulations)'],
+  ['eaten by Nippers, who do not apologise', 'eaten'],
+  ['crushed by you. We are not judging. We are.', 'crushed by you. We are not judging. We are.'],
+];
+function loadRuns() { // best runs, longest first
+  let r; try { r = JSON.parse(store.get('kretslopp_runs')); } catch (e) {}
+  if (Array.isArray(r)) return r;
+  const old = +store.get('kretslopp_best2'); return old ? [{ t: old, w: '', d: '' }] : []; // record from before the board existed
+}
+function endRun() {
+  const o = sim.over, ST = C.SEASON_TICKS, YT = ST * 4, yrs = Math.floor(o.tick / YT), ses = Math.floor(o.tick % YT / ST);
+  const runs = loadRuns(), bestOld = runs.length ? +runs[0].t : 0, rec = o.tick > bestOld;
+  const span = t => { const y = Math.floor(t / YT), q = Math.floor(t % YT / ST); return y + ' yr' + (q ? ' + ' + q : ''); };
+  $('endTitle').textContent = pick(['The ecosystem collapsed', 'It went the way it went', 'Nature has spoken']) + (rec && bestOld ? ' – but a new record!' : '');
+  $('obit').innerHTML = `<b style="color:${['var(--A)', 'var(--B)'][o.sp]}">${NAMES[o.sp]}</b> died out first – ${SEASONS[o.season].toLowerCase()}, year ${yrs + 1}.<br>Most common cause of death at the end: ${CAUSES[o.cause][o.sp]}.`;
+  $('endStats').innerHTML = `<div><b>${span(o.tick)}</b><small>${ses ? 'and seasons ' : ''}survived</small></div><div><b>${span(Math.max(bestOld, o.tick))}</b><small>your record</small></div><div><b>${world[0]}</b><small>world</small></div>`;
+  const me = { t: o.tick, w: world[0], d: new Date().toLocaleDateString('sv-SE') }; runs.push(me); runs.sort((a, b) => b.t - a.t); runs.length = Math.min(runs.length, 5);
+  store.set('kretslopp_runs', JSON.stringify(runs));
+  const board = $('board'); board.textContent = '';
+  for (const r of runs) { const li = document.createElement('li'); li.textContent = 'Year ' + (Math.floor(r.t / YT) + 1) + ', ' + SEASONS[Math.floor(r.t % YT / ST)].toLowerCase() + (r.w ? ' · ' + r.w : '') + (r.d ? ' · ' + r.d : ''); if (r === me) li.className = 'me'; board.appendChild(li); }
+  checkMedals(); const md = $('medals'); md.textContent = '';
+  for (const m of MEDALS) { const el = document.createElement('span'); el.textContent = m[1]; el.className = (medals.includes(m[0]) ? 'got' : '') + (run.medals.includes(m[0]) ? ' new' : ''); el.onclick = () => $('medalTxt').textContent = m[2] + ' – ' + m[3]; md.appendChild(el); }
+  $('medalTxt').textContent = (run.medals.length ? '🏅 New: ' + MEDALS.filter(m => run.medals.includes(m[0])).map(m => m[2]).join(', ') + ' · ' : '') + medals.length + '/' + MEDALS.length + ' medals · tap one to see what it takes';
+  const short = Math.ceil((bestOld - o.tick) / ST); if (short > 0 && short <= 4) $('obit').innerHTML += `<br><b>So close – only ${short} season${short > 1 ? 's' : ''} short of your record.</b>`;
+  const had = openWorlds().length; life += o.tick; store.set('kretslopp_life', life);
+  const open = openWorlds(), next = WORLDS[open.length], yrsLife = life / YT;
+  $('unlock').innerHTML = (open.length > had ? `🔓 New world unlocked: <b>${open[open.length - 1][0]}</b><br>` : '')
+    + (next ? `${yrsLife.toFixed(1)} years survived in total · <b>${next[0]}</b> unlocks at ${next[3]}<div class="meter"><i style="width:${Math.min(100, yrsLife / next[3] * 100)}%"></i></div>` : `${yrsLife.toFixed(1)} years survived in total · every world unlocked`);
+  sfx(rec && bestOld ? 'record' : 'over');
+  openModal('end'); requestAnimationFrame(drawGraph);
+}
+function drawGraph() {
+  const [x, w, h] = fit($('graph')), ST = C.SEASON_TICKS, Tt = Math.max(sim.tick, ST), pt = 20, pb = 6, H = h - pt - pb, X = t => 4 + t / Tt * (w - 8);
+  const BAND = ['rgba(111,207,98,.16)', 'rgba(242,199,68,.16)', 'rgba(224,122,53,.16)', 'rgba(156,198,238,.2)'];
+  x.font = '11px system-ui,sans-serif'; x.textBaseline = 'top';
+  for (let s = 0; s * ST < Tt; s++) {
+    x.fillStyle = BAND[s % 4]; x.fillRect(X(s * ST), pt, X(Math.min(Tt, (s + 1) * ST)) - X(s * ST), H);
+    if (s % 4 === 0) { x.fillStyle = 'rgba(255,255,255,.55)'; x.fillText('Year ' + (s / 4 + 1), X(s * ST) + 3, pt + 3); x.fillRect(X(s * ST), pt, 1, H); }
+  }
+  let max = 1; for (let i = 0; i < sim.hA.length; i++) max = Math.max(max, sim.hA[i], sim.hB[i], sim.hC[i]);
+  const line = (arr, col, top, dash) => { x.beginPath(); arr.forEach((v, i) => { const px = X((i + 1) * C.HIST_EVERY), py = pt + H - v / top * H; i ? x.lineTo(px, py) : x.moveTo(px, py); }); x.setLineDash(dash || []); x.strokeStyle = col; x.lineWidth = dash ? 1.2 : 1.8; x.lineJoin = 'round'; x.stroke(); x.setLineDash([]); };
+  line(sim.hH, 'rgba(255,255,255,.8)', 100, [4, 3]); line(sim.hA, '#ffc638', max); line(sim.hB, '#46e1ff', max); if (sim.cActive) line(sim.hC, '#ff4880', max);
+  x.textAlign = 'center';
+  for (const m of sim.marks) { const px = X(m.t); x.setLineDash([2, 3]); x.strokeStyle = 'rgba(255,255,255,.6)'; x.lineWidth = 1; x.beginPath(); x.moveTo(px, pt); x.lineTo(px, pt + H); x.stroke(); x.setLineDash([]); x.fillStyle = '#fff'; x.fillText(m.type === 'drought' ? '🏜' : m.type === 'flood' ? '🌊' : '🦷', Math.max(9, Math.min(w - 9, px)), 3); }
+  x.fillStyle = '#ff5a4a'; x.font = 'bold 15px system-ui,sans-serif'; x.fillText('✖', w - 10, pt + H - 16); x.textAlign = 'left';
+}
+
+/* ---------- game loop ---------- */
+function newGame() {
+  const open = openWorlds(); let w; do w = pick(open); while (open.length > 1 && w === world); world = w;
+  const runs = loadRuns(); pb = runs.length ? +runs[0].t : 0; stars = 0; run = { fed: 0, goals: 0, low: 0, hadC: false, nipGone: false, medals: [] };
+  sim = createSim((Date.now() ^ Math.random() * 1e9) >>> 0, world[2]); C = sim.cfg; resN = resW = C.RESERVOIR_START; stroke = null; said = {}; acc = 0; lastSayTick = -999;
+  zoom = 1; panX = panY = 0; applyView(); setPaused(false); closeModal('end'); newGoal(); checkGoal(); updateHud();
+  const x = $('spark').getContext('2d'); x.clearRect(0, 0, 9999, 9999);
+  say('🌍 ' + world[0] + '. ' + world[1], 6000);
+}
+function tick() {
+  stepSim(sim);
+  drainMessages(); narrate(); if (!sim.over) checkGoal(); updateHud();
+  if (pb && sim.tick === pb + 1) { banner('🏆 New record! Everything from here is a bonus.', 5000); sfx('record'); }
+  if (document.body.classList.contains('danger') && sim.tick % 12 === 0) sfx('danger');
+  if (sim.pop[2] >= 100) run.hadC = true; else if (run.hadC && !sim.pop[2]) run.nipGone = true; // only a pack that grew to 100 counts
+  if (!run.low && Math.min(sim.pop[0], sim.pop[1]) < 10) run.low = sim.tick;
+  if (sim.tick % 10 === 0 && !sim.over) checkMedals();
+  if (sim.tick % C.HIST_EVERY === 0) drawSpark();
+  if (sim.over) { endStroke(false); endRun(); }
+}
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(100, now - last); last = now;
+  if (document.hidden) return;
+  if (!paused && !modals && !sim.over) { acc += dt * C.TICKS_PER_SEC * speed / 1000; let n = 0; while (acc >= 1 && n++ < 6 && !sim.over) { tick(); acc -= 1; } if (acc > 3) acc = 0; }
+  render(now);
+}
+document.addEventListener('visibilitychange', () => { acc = 0; last = performance.now(); }); // hidden tab = automatic pause
+addEventListener('resize', resize);
+$('restart').onclick = newGame;
+setTool('feed'); resize(); newGame();
+if (!store.get('kretslopp_intro')) openModal('intro');
+window.__game = { get sim() { return sim; } };
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

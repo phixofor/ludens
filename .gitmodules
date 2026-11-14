@@ -1,0 +1,6 @@
+[submodule "kretslopp-web"]
+	path = kretslopp-web
+	url = https://github.com/phixofor/kretslopp-web.git
+[submodule "ballatro"]
+	path = ballatro
+	url = https://github.com/phixofor/ballatro.git
